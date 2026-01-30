@@ -174,17 +174,21 @@ const api = {
 
     // AUTH API
     getCurrentUser: async (): Promise<User | null> => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return null;
+        try {
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            if (sessionError || !session) return null;
 
-        const { data: profile, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
+            const { data: profile, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', session.user.id)
+                .single();
 
-        if (error) return null;
-        return mapProfileToUser(profile);
+            if (error) return null;
+            return mapProfileToUser(profile);
+        } catch (e) {
+            return null;
+        }
     },
 
     login: async (email: string, password: string): Promise<User> => {
@@ -192,7 +196,13 @@ const api = {
             email,
             password
         });
-        if (authError) throw authError;
+
+        if (authError) {
+            if (authError.message === 'Invalid login credentials') {
+                throw new Error("Email ou mot de passe incorrect.");
+            }
+            throw authError;
+        }
 
         const { data: profile, error: profileError } = await supabase
             .from('profiles')
@@ -200,7 +210,7 @@ const api = {
             .eq('id', authData.user.id)
             .single();
 
-        if (profileError) throw profileError;
+        if (profileError) throw new Error("Profil non trouvé. Veuillez contacter le support.");
         return mapProfileToUser(profile);
     },
 
@@ -212,19 +222,33 @@ const api = {
                 data: { name }
             }
         });
-        if (authError) throw authError;
+
+        if (authError) {
+            if (authError.message.includes('User already registered')) {
+                throw new Error("Cet email est déjà utilisé.");
+            }
+            throw authError;
+        }
+
         if (!authData.user) throw new Error("Erreur lors de la création du compte.");
 
-        // Wait for profile trigger
-        await new Promise(r => setTimeout(r, 2000));
+        // Wait for profile trigger (Supabase is usually fast but sometimes needs a beat)
+        let profile = null;
+        for (let i = 0; i < 5; i++) {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', authData.user.id)
+                .single();
 
-        const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', authData.user.id)
-            .single();
+            if (data && !error) {
+                profile = data;
+                break;
+            }
+            await new Promise(r => setTimeout(r, 1000));
+        }
 
-        if (profileError) throw profileError;
+        if (!profile) throw new Error("Le profil n'a pas pu être créé. Essayez de vous connecter.");
         return mapProfileToUser(profile);
     },
 
