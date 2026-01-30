@@ -1,7 +1,6 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
-import type { Product, User, View, Transaction, Conversation, Message, Order, Report } from './types';
-import { ProductStatus, TransactionType, TransactionStatus, ReportStatus } from './types';
+import type { Product, User, Conversation, Message, Transaction, Order, Report, Dispute, View } from './types';
+import { ProductStatus, OrderStatus, TransactionType, TransactionStatus, ReportStatus, DisputeStatus } from './types';
 import api from './lib/api';
 import { supabase } from './lib/supabase';
 import Header from './components/Header';
@@ -63,6 +62,7 @@ const App: React.FC = () => {
   const [isProModalOpen, setIsProModalOpen] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
+  const [disputes, setDisputes] = useState<Dispute[]>([]);
 
   const [appSettings, setAppSettings] = useState<AppSettings>({
     commission: 5,
@@ -98,22 +98,24 @@ const App: React.FC = () => {
 
   const fetchData = useCallback(async () => {
     try {
-      const [p, u, o, tx, s, c, r] = await Promise.all([
+      const [pData, uData, oData, tData, rData, dData, settingsData, contentData] = await Promise.all([
         api.getProducts(),
         api.getUsers(),
         api.getOrders(),
         api.getTransactions(),
+        api.getReports(),
+        api.getDisputes(),
         api.getSettings<AppSettings>('app_settings'),
         api.getSettings<AppContent>('app_content'),
-        api.getReports(),
       ]);
-      setProducts(p);
-      setUsers(u);
-      setOrders(o);
-      setTransactions(tx);
-      if (s) setAppSettings(s);
-      if (c) setAppContent(c);
-      setReports(r);
+      setProducts(pData);
+      setUsers(uData);
+      setOrders(oData);
+      setTransactions(tData);
+      setReports(rData);
+      setDisputes(dData);
+      if (settingsData) setAppSettings(settingsData);
+      if (contentData) setAppContent(contentData);
     } catch (err) {
       console.error("Data fetch error:", err);
     } finally {
@@ -121,7 +123,13 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Sync with Supabase Auth
+  const fetchConversations = useCallback(async () => {
+    if (currentUser) {
+      const convs = await api.getConversationsForUser(currentUser.id);
+      setConversations(convs);
+    }
+  }, [currentUser]);
+
   useEffect(() => {
     const initAuth = async () => {
       const user = await api.getCurrentUser();
@@ -154,7 +162,10 @@ const App: React.FC = () => {
     fetchData();
   }, [fetchData]);
 
-  // Real-time Messages Subscription
+  useEffect(() => {
+    fetchConversations();
+  }, [fetchConversations]);
+
   useEffect(() => {
     if (!currentUser) return;
 
@@ -275,7 +286,7 @@ const App: React.FC = () => {
       const newOrder = await api.createOrder(product, currentUser, buyerProtectionFee, shippingFee, totalAmount);
       setOrders(prev => [newOrder, ...prev]);
       setProducts(prev => prev.map(p => p.id === product.id ? { ...p, status: ProductStatus.Sold } : p));
-      showToast(`Commande passée !`, "fa-solid fa-check-circle");
+      showToast(`Commande passée!`, "fa-solid fa-check-circle");
       handleNavigate({ name: 'orders' });
       fetchData();
     } catch (err) {
@@ -312,7 +323,7 @@ const App: React.FC = () => {
         const updated = await api.updateProduct({ ...product, boostedUntil, isFeatured: option === 'feature' });
         setProducts(prev => prev.map(p => p.id === productId ? updated : p));
       }
-      showToast(`Boost activé !`, 'fa-solid fa-rocket');
+      showToast(`Boost activé!`, 'fa-solid fa-rocket');
       const finalUser = await api.getCurrentUser();
       setCurrentUser(finalUser);
     } catch (err) {
@@ -343,17 +354,6 @@ const App: React.FC = () => {
     handleNavigate({ name: 'home' });
     showToast("Déconnecté.", "fa-solid fa-arrow-right-from-bracket");
   };
-
-  const fetchConversations = useCallback(async () => {
-    if (currentUser) {
-      const convs = await api.getConversationsForUser(currentUser.id);
-      setConversations(convs);
-    }
-  }, [currentUser]);
-
-  useEffect(() => {
-    fetchConversations();
-  }, [fetchConversations]);
 
   const handleMessageSeller = useCallback(async (recipient: User, product: Product) => {
     if (!currentUser) {
@@ -404,12 +404,11 @@ const App: React.FC = () => {
       if (product && currentUser) {
         const updated = await api.updateProduct({ ...product, status });
         setProducts(prev => prev.map(p => p.id === productId ? updated : p));
-        showToast(`Statut mis à jour : ${status}`, 'fa-solid fa-check-circle');
+        showToast(`Statut mis à jour: ${status}`, 'fa-solid fa-check-circle');
 
-        // Automated Notification Message
         let notificationMsg = '';
         if (status === ProductStatus.Approved) {
-          notificationMsg = `Félicitations ! Votre article "${product.title}" a été approuvé et est maintenant visible sur la plateforme.`;
+          notificationMsg = `Félicitations! Votre article "${product.title}" a été approuvé et est maintenant visible sur la plateforme.`;
         } else if (status === ProductStatus.Rejected) {
           notificationMsg = `Désolé, votre article "${product.title}" a été refusé car il ne respecte pas nos conditions générales de vente. Veuillez le modifier et le soumettre à nouveau.`;
         }
@@ -456,18 +455,35 @@ const App: React.FC = () => {
     if (!currentUser) return;
     try {
       await api.addReport(productId, currentUser.id, reason, details);
-      showToast("Signalement envoyé.", "fa-solid fa-flag");
+      showToast('Merci de nous avoir aidé. Votre signalement a été envoyé.', 'fa-solid fa-check-circle');
       setProductToReport(null);
     } catch (err) {
-      showToast("Erreur lors du signalement.", "fa-solid fa-warning");
+      showToast('Erreur signalement.', 'fa-solid fa-warning');
     }
   }, [currentUser]);
+
+  const handleDisputeStatusChange = useCallback(async (disputeId: string, status: DisputeStatus) => {
+    try {
+      const updated = await api.updateDisputeStatus(disputeId, status);
+      setDisputes(prev => prev.map(d => d.id === disputeId ? updated : d));
+      showToast(`Statut du litige mis à jour: ${status}`, 'fa-solid fa-check-circle');
+
+      const dispute = disputes.find(d => d.id === disputeId);
+      if (dispute && currentUser) {
+        const conv = await api.findOrCreateConversation(currentUser, dispute.initiator, undefined as any);
+        await api.sendMessage(conv.id, `[NOTIFICATION SYSTÈME] Votre litige a été marqué comme ${status}. Resolution: ${updated.resolution || 'N/A'}`, currentUser.id);
+        fetchConversations();
+      }
+    } catch (err) {
+      showToast('Erreur mise à jour litige.', 'fa-solid fa-warning');
+    }
+  }, [disputes, currentUser, fetchConversations]);
 
   const handleReportStatusChange = useCallback(async (reportId: string, status: ReportStatus) => {
     try {
       const updated = await api.updateReportStatus(reportId, status);
       setReports(prev => prev.map(r => r.id === reportId ? updated : r));
-      showToast(`Signalement mis à jour : ${status}`, 'fa-solid fa-check-circle');
+      showToast(`Signalement mis à jour: ${status}`, 'fa-solid fa-check-circle');
 
       const report = reports.find(r => r.id === reportId);
       if (report && currentUser) {
@@ -479,7 +495,6 @@ const App: React.FC = () => {
         }
 
         if (msg && report.reporter.id !== currentUser.id) {
-          // Create a conversation without a product if possible, or use the reported product
           const conv = await api.findOrCreateConversation(currentUser, report.reporter, report.product);
           await api.sendMessage(conv.id, `[NOTIFICATION SYSTÈME] ${msg}`, currentUser.id);
           fetchConversations();
@@ -490,6 +505,21 @@ const App: React.FC = () => {
     }
   }, [reports, currentUser, fetchConversations]);
 
+  const handleUpdateOrderShipping = useCallback(async (orderId: string, trackingNumber: string, shippingProvider: string) => {
+    try {
+      const updated = await api.updateOrderShipping(orderId, trackingNumber, shippingProvider);
+      setOrders(prev => prev.map(o => o.id === orderId ? updated : o));
+      showToast('Informations d\'expédition mises à jour.', 'fa-solid fa-truck');
+
+      if (currentUser) {
+        const conv = await api.findOrCreateConversation(currentUser, updated.buyer, updated.product);
+        await api.sendMessage(conv.id, `🕒 Bonne nouvelle ! Votre commande pour "${updated.product.title}" a été expédiée.\n📦 Transporteur : ${shippingProvider}\n📜 N° de suivi : ${trackingNumber}`, currentUser.id);
+        fetchConversations();
+      }
+    } catch (err) {
+      showToast('Erreur expédition.', 'fa-solid fa-warning');
+    }
+  }, [currentUser, fetchConversations]);
 
   const toggleTheme = () => {
     setTheme(prev => {
@@ -500,172 +530,168 @@ const App: React.FC = () => {
     });
   };
 
-  const renderView = () => {
-    if (view.name === 'auth') {
-      return <AuthPage onLogin={handleLogin} showToast={showToast} onNavigate={handleNavigate} logoUrl={appContent.logoUrl} />
+  const mainContent = (() => {
+    if (isLoading && view.name === 'home') {
+      return (
+        <div className="container mx-auto px-4 py-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)}
+          </div>
+        </div>
+      );
     }
 
-    const mainContent = (() => {
-      if (isLoading && view.name === 'home') {
-        return (
-          <div className="container mx-auto px-4 py-8">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)}
-            </div>
-          </div>
-        );
-      }
-
-      switch (view.name) {
-        case 'home':
-          return <HomePage
-            products={products}
-            onProductSelect={(product) => handleNavigate({ name: 'productDetail', product })}
-            onNavigate={handleNavigate}
-            savedItems={savedItems}
-            onToggleSave={handleToggleSave}
-            currentUser={currentUser}
-            onReportProduct={setProductToReport}
-            heroImageUrl={appContent.heroImageUrl || ''}
-            heroSlogan={appContent.heroSlogan || ''}
-            heroSubSlogan={appContent.heroSubSlogan || ''}
-          />;
-        case 'productDetail':
-          return <ProductDetailPage
-            product={view.product}
-            allProducts={products}
-            onBack={() => handleNavigate({ name: 'home' })}
-            onSellerClick={(user) => handleNavigate({ name: 'profile', user })}
-            onProductSelect={(product) => handleNavigate({ name: 'productDetail', product })}
-            savedItems={savedItems}
-            onToggleSave={handleToggleSave}
-            cartItems={cartItems}
-            onAddToCart={handleAddToCart}
-            onPurchase={handleCreateOrder}
-            currentUser={currentUser}
-            onReportProduct={setProductToReport}
-            onMessageSeller={handleMessageSeller}
-            showToast={showToast}
-            appSettings={appSettings}
-          />;
-        case 'addItem':
-          return <AddItemPage onAddItem={handleAddItem} onCancel={() => handleNavigate({ name: 'home' })} />;
-        case 'editItem':
-          return <EditItemPage
-            product={view.product}
-            onUpdateItem={handleUpdateItem}
-            onCancel={() => currentUser ? handleNavigate({ name: 'profile', user: currentUser }) : handleNavigate({ name: 'home' })}
-          />;
-        case 'profile':
-          return <ProfilePage
-            user={view.user}
-            allProducts={products}
-            onProductSelect={(product) => handleNavigate({ name: 'productDetail', product })}
-            onBoostProduct={handleBoostProduct}
-            onDeleteProduct={handleDeleteProduct}
-            onEditProduct={(product) => handleNavigate({ name: 'editItem', product })}
-            savedItems={savedItems}
-            onToggleSave={handleToggleSave}
-            appSettings={appSettings}
-            currentUser={currentUser}
-            onReportProduct={setProductToReport}
-            onOpenAddBalance={() => setIsAddingBalance(true)}
-            onOpenProModal={() => setIsProModalOpen(true)}
-            onNavigate={handleNavigate}
-          />;
-        case 'saved':
-          return <SavedItemsPage
-            products={products}
-            savedItems={savedItems}
-            onProductSelect={(product) => handleNavigate({ name: 'productDetail', product })}
-            onToggleSave={handleToggleSave}
-            onNavigate={handleNavigate}
-            currentUser={currentUser}
-            onReportProduct={setProductToReport}
-          />;
-        case 'search':
-          return <SearchResultsPage
-            query={view.query}
-            allProducts={products}
-            onProductSelect={(product) => handleNavigate({ name: 'productDetail', product })}
-            savedItems={savedItems}
-            onToggleSave={handleToggleSave}
-            currentUser={currentUser}
-            onReportProduct={setProductToReport}
-          />;
-        case 'admin':
-          return <AdminPage
-            onNavigate={handleNavigate}
-            appSettings={appSettings}
-            appContent={{ ...appContent }}
-            onUpdateSettings={handleUpdateSettings}
-            products={products}
-            users={users}
-            transactions={transactions}
-            reports={reports}
-            onProductStatusChange={handleProductStatusChange}
-            onReportStatusChange={handleReportStatusChange}
-            showToast={showToast}
-            onContentUpdate={handleContentUpdate}
-            onToggleUserProStatus={handleToggleUserProStatus}
-            onToggleUserBan={handleToggleUserBan}
-          />
-        case 'chat':
-          return <ChatPage
-            currentUser={currentUser!}
-            conversations={conversations}
-            onNavigate={handleNavigate}
-            onSendMessage={handleSendMessage}
-            initialConversationId={view.conversationId}
-            isConversationsLoading={isLoading}
-          />;
-        case 'orders':
-          return <OrdersPage
-            currentUser={currentUser!}
-            orders={orders}
-            showToast={showToast}
-            onNavigate={handleNavigate}
-          />
-        case 'cart':
-          return <CartPage
-            currentUser={currentUser!}
-            cartItems={cartItems}
-            allProducts={products}
-            onRemoveFromCart={handleRemoveFromCart}
-            onPurchase={handleCreateOrder}
-            onNavigate={handleNavigate}
-            appSettings={appSettings}
-          />
-        default:
-          return <div>Page not found</div>;
-      }
-    })();
-
-    return (
-      <div className="min-h-screen bg-secondary dark:bg-slate-900 font-sans transition-colors duration-300">
-        <Header
+    switch (view.name) {
+      case 'home':
+        return <HomePage
+          products={products}
+          onProductSelect={(product) => handleNavigate({ name: 'productDetail', product })}
           onNavigate={handleNavigate}
-          user={currentUser}
-          onLogout={handleLogout}
-          theme={theme}
-          toggleTheme={toggleTheme}
-          savedItemsCount={savedItems.size}
-          cartItemsCount={cartItems.size}
+          savedItems={savedItems}
+          onToggleSave={handleToggleSave}
+          currentUser={currentUser}
+          onReportProduct={setProductToReport}
+          heroImageUrl={appContent.heroImageUrl || ''}
+          heroSlogan={appContent.heroSlogan || ''}
+          heroSubSlogan={appContent.heroSubSlogan || ''}
+        />;
+      case 'productDetail':
+        return <ProductDetailPage
+          product={view.product}
           allProducts={products}
-          logoUrl={appContent.logoUrl}
-        />
-        <main className="pt-28">
-          {mainContent}
-        </main>
-        {toast && <Toast key={toast.id} message={toast.message} icon={toast.icon} />}
-        {productToReport && <ReportModal product={productToReport} onClose={() => setProductToReport(null)} onSubmit={handleReportProduct} />}
-        {isAddingBalance && currentUser && <AddBalanceModal onClose={() => setIsAddingBalance(false)} onAddBalance={handleAddBalance} />}
-        {isProModalOpen && currentUser && <ProModal onClose={() => setIsProModalOpen(false)} onSubscribe={() => { }} settings={appSettings} currentUser={currentUser} />}
-      </div>
-    );
-  };
+          onBack={() => handleNavigate({ name: 'home' })}
+          onSellerClick={(user) => handleNavigate({ name: 'profile', user })}
+          onProductSelect={(product) => handleNavigate({ name: 'productDetail', product })}
+          savedItems={savedItems}
+          onToggleSave={handleToggleSave}
+          cartItems={cartItems}
+          onAddToCart={handleAddToCart}
+          onPurchase={handleCreateOrder}
+          currentUser={currentUser}
+          onReportProduct={setProductToReport}
+          onMessageSeller={handleMessageSeller}
+          showToast={showToast}
+          appSettings={appSettings}
+        />;
+      case 'addItem':
+        return <AddItemPage onAddItem={handleAddItem} onCancel={() => handleNavigate({ name: 'home' })} />;
+      case 'editItem':
+        return <EditItemPage
+          product={view.product}
+          onUpdateItem={handleUpdateItem}
+          onCancel={() => currentUser ? handleNavigate({ name: 'profile', user: currentUser }) : handleNavigate({ name: 'home' })}
+        />;
+      case 'profile':
+        return <ProfilePage
+          user={view.user}
+          allProducts={products}
+          onProductSelect={(product) => handleNavigate({ name: 'productDetail', product })}
+          onBoostProduct={handleBoostProduct}
+          onDeleteProduct={handleDeleteProduct}
+          onEditProduct={(product) => handleNavigate({ name: 'editItem', product })}
+          savedItems={savedItems}
+          onToggleSave={handleToggleSave}
+          appSettings={appSettings}
+          currentUser={currentUser}
+          onReportProduct={setProductToReport}
+          onOpenAddBalance={() => setIsAddingBalance(true)}
+          onOpenProModal={() => setIsProModalOpen(true)}
+          onNavigate={handleNavigate}
+        />;
+      case 'saved':
+        return <SavedItemsPage
+          products={products}
+          savedItems={savedItems}
+          onProductSelect={(product) => handleNavigate({ name: 'productDetail', product })}
+          onToggleSave={handleToggleSave}
+          onNavigate={handleNavigate}
+          currentUser={currentUser}
+          onReportProduct={setProductToReport}
+        />;
+      case 'search':
+        return <SearchResultsPage
+          query={view.query}
+          allProducts={products}
+          onProductSelect={(product) => handleNavigate({ name: 'productDetail', product })}
+          savedItems={savedItems}
+          onToggleSave={handleToggleSave}
+          currentUser={currentUser}
+          onReportProduct={setProductToReport}
+        />;
+      case 'admin':
+        return <AdminPage
+          onNavigate={handleNavigate}
+          appSettings={appSettings}
+          appContent={{ ...appContent }}
+          onUpdateSettings={handleUpdateSettings}
+          products={products}
+          users={users}
+          transactions={transactions}
+          reports={reports}
+          onProductStatusChange={handleProductStatusChange}
+          onReportStatusChange={handleReportStatusChange}
+          showToast={showToast}
+          onContentUpdate={handleContentUpdate}
+          onToggleUserProStatus={handleToggleUserProStatus}
+          onToggleUserBan={handleToggleUserBan}
+          disputes={disputes}
+          onDisputeStatusChange={handleDisputeStatusChange}
+          orders={orders}
+          onUpdateOrderShipping={handleUpdateOrderShipping}
+        />;
+      case 'chat':
+        return <ChatPage
+          currentUser={currentUser!}
+          conversations={conversations}
+          onNavigate={handleNavigate}
+          onSendMessage={handleSendMessage}
+          initialConversationId={view.conversationId}
+          isConversationsLoading={isLoading}
+        />;
+      case 'orders':
+        return <OrdersPage
+          currentUser={currentUser!}
+          orders={orders}
+          showToast={showToast}
+          onNavigate={handleNavigate}
+        />;
+      case 'cart':
+        return <CartPage
+          currentUser={currentUser!}
+          cartItems={cartItems}
+          allProducts={products}
+          onRemoveFromCart={handleRemoveFromCart}
+          onPurchase={handleCreateOrder}
+          onNavigate={handleNavigate}
+          appSettings={appSettings}
+        />;
+      default:
+        return <div>Page not found</div>;
+    }
+  })();
 
-  return renderView();
+  return (
+    <div className="min-h-screen bg-secondary dark:bg-slate-900 font-sans transition-colors duration-300">
+      <Header
+        onNavigate={handleNavigate}
+        user={currentUser}
+        onLogout={handleLogout}
+        theme={theme}
+        toggleTheme={toggleTheme}
+        savedItemsCount={savedItems.size}
+        cartItemsCount={cartItems.size}
+        allProducts={products}
+        logoUrl={appContent.logoUrl}
+      />
+      <main className="pt-28">
+        {mainContent}
+      </main>
+      {toast && <Toast key={toast.id} message={toast.message} icon={toast.icon} />}
+      {productToReport && <ReportModal product={productToReport} onClose={() => setProductToReport(null)} onSubmit={handleReportProduct} />}
+      {isAddingBalance && currentUser && <AddBalanceModal onClose={() => setIsAddingBalance(false)} onAddBalance={handleAddBalance} />}
+      {isProModalOpen && currentUser && <ProModal onClose={() => setIsProModalOpen(false)} onSubscribe={() => { }} settings={appSettings} currentUser={currentUser} />}
+    </div>
+  );
 };
 
 export default App;

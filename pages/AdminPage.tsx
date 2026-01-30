@@ -1,7 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import type { View, Product, User, Transaction } from '../types';
 import type { AppSettings, AppContent } from '../App';
-import { ProductStatus, TransactionType } from '../types';
 import { Card } from '../components/ui/Card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/Tabs';
 import StatCard from '../components/admin/StatCard';
@@ -13,9 +11,11 @@ import TransactionsTable from '../components/admin/TransactionsTable';
 import AdminPayments from '../components/admin/AdminPayments';
 import AdminContent from '../components/admin/AdminContent';
 import ReportTable from '../components/admin/ReportTable';
+import DisputeTable from '../components/admin/DisputeTable';
+import ShippingTable from '../components/admin/ShippingTable';
 import ConfirmationModal from '../components/ConfirmationModal';
-import { ReportStatus } from '../types';
-import type { Report } from '../types';
+import { ProductStatus, TransactionType, OrderStatus, ReportStatus, DisputeStatus } from '../types';
+import type { View, Product, User, Transaction, Order, Report, Dispute } from '../types';
 
 interface AdminPageProps {
     onNavigate: (view: View) => void;
@@ -32,6 +32,10 @@ interface AdminPageProps {
     onToggleUserBan: (userId: string, isBanned: boolean) => void;
     reports: Report[];
     onReportStatusChange: (reportId: string, status: ReportStatus) => void;
+    disputes: Dispute[];
+    onDisputeStatusChange: (disputeId: string, status: DisputeStatus) => void;
+    orders: Order[];
+    onUpdateOrderShipping: (orderId: string, trackingNumber: string, shippingProvider: string) => void;
 }
 
 const AdminPage: React.FC<AdminPageProps> = ({
@@ -49,6 +53,10 @@ const AdminPage: React.FC<AdminPageProps> = ({
     onToggleUserBan,
     reports,
     onReportStatusChange,
+    disputes,
+    onDisputeStatusChange,
+    orders,
+    onUpdateOrderShipping,
 }) => {
     const [userSearch, setUserSearch] = useState('');
     const [productSearch, setProductSearch] = useState('');
@@ -122,7 +130,9 @@ const AdminPage: React.FC<AdminPageProps> = ({
                     <TabsTrigger value="users"><i className="fa-solid fa-users mr-2"></i>Utilisateurs</TabsTrigger>
                     <TabsTrigger value="products"><i className="fa-solid fa-box mr-2"></i>Articles</TabsTrigger>
                     <TabsTrigger value="transactions"><i className="fa-solid fa-receipt mr-2"></i>Transactions</TabsTrigger>
+                    <TabsTrigger value="shipping"><i className="fa-solid fa-truck mr-2"></i>Expéditions</TabsTrigger>
                     <TabsTrigger value="reports"><i className="fa-solid fa-flag mr-2"></i>Signalements</TabsTrigger>
+                    <TabsTrigger value="disputes"><i className="fa-solid fa-scale-balanced mr-2"></i>Litiges</TabsTrigger>
                     <TabsTrigger value="settings"><i className="fa-solid fa-cogs mr-2"></i>Paramètres</TabsTrigger>
                     <TabsTrigger value="payments"><i className="fa-solid fa-credit-card mr-2"></i>Paiements</TabsTrigger>
                     <TabsTrigger value="content"><i className="fa-solid fa-file-lines mr-2"></i>Contenu</TabsTrigger>
@@ -162,6 +172,15 @@ const AdminPage: React.FC<AdminPageProps> = ({
                     </Card>
                 </TabsContent>
 
+                <TabsContent value="shipping">
+                    <Card>
+                        <ShippingTable
+                            orders={orders}
+                            onUpdateShipping={onUpdateOrderShipping}
+                        />
+                    </Card>
+                </TabsContent>
+
                 <TabsContent value="transactions">
                     <Card>
                         <TransactionsTable
@@ -177,6 +196,16 @@ const AdminPage: React.FC<AdminPageProps> = ({
                             reports={reports}
                             onStatusChange={onReportStatusChange}
                             onViewProduct={(id) => onNavigate({ name: 'productDetail', product: products.find(p => p.id === id)! })}
+                        />
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="disputes">
+                    <Card>
+                        <DisputeTable
+                            disputes={disputes}
+                            onStatusChange={onDisputeStatusChange}
+                            onViewOrder={(orderId) => onNavigate({ name: 'orders' })}
                         />
                     </Card>
                 </TabsContent>

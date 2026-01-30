@@ -152,6 +152,9 @@ export interface Order {
   shippingFee: number;
   buyerProtectionFee: number;
   trackingNumber?: string;
+  shippingProvider?: string;
+  shippedAt?: string;
+  deliveredAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -176,6 +179,23 @@ export enum ReportStatus {
   Pending = "En attente",
   Resolved = "Résolu",
   Dismissed = "Rejeté",
+}
+
+export enum DisputeStatus {
+  Open = "Ouvert",
+  Resolved = "Résolu",
+  Closed = "Fermé",
+}
+
+export interface Dispute {
+  id: string;
+  orderId: string;
+  initiator: User;
+  reason: string;
+  description: string;
+  status: DisputeStatus;
+  resolution?: string;
+  createdAt: string;
 }
 
 export interface Report {

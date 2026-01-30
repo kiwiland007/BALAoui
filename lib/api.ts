@@ -1,7 +1,7 @@
 
 import { supabase } from './supabase';
-import type { Product, User, Review, Transaction, Conversation, Message, Order, Report } from '../types';
-import { ProductStatus, OrderStatus, TransactionType, TransactionStatus, ReportStatus } from '../types';
+import type { Product, User, Review, Transaction, Conversation, Message, Order, Report, Dispute } from '../types';
+import { ProductStatus, OrderStatus, TransactionType, TransactionStatus, ReportStatus, DisputeStatus } from '../types';
 
 // Utility to convert Supabase row to our app types
 const mapProfileToUser = (profile: any): User => ({
@@ -44,6 +44,17 @@ const mapReportToApp = (r: any): Report => ({
     details: r.details,
     status: r.status as ReportStatus,
     createdAt: r.created_at
+});
+
+const mapDisputeToApp = (d: any): Dispute => ({
+    id: d.id,
+    orderId: d.order_id,
+    initiator: mapProfileToUser(d.initiator),
+    reason: d.reason,
+    description: d.description,
+    status: d.status as DisputeStatus,
+    resolution: d.resolution,
+    createdAt: d.created_at
 });
 
 const api = {
@@ -283,6 +294,10 @@ const api = {
             totalAmount: Number(o.total_amount),
             shippingFee: Number(o.shipping_fee),
             buyerProtectionFee: Number(o.buyer_protection_fee),
+            trackingNumber: o.tracking_number,
+            shippingProvider: o.shipping_provider,
+            shippedAt: o.shipped_at,
+            deliveredAt: o.delivered_at,
             createdAt: o.created_at,
             updatedAt: o.updated_at
         }));
@@ -319,6 +334,43 @@ const api = {
             totalAmount: Number(data.total_amount),
             shippingFee: Number(data.shipping_fee),
             buyerProtectionFee: Number(data.buyer_protection_fee),
+            trackingNumber: data.tracking_number,
+            shippingProvider: data.shipping_provider,
+            shippedAt: data.shipped_at,
+            deliveredAt: data.delivered_at,
+            createdAt: data.created_at,
+            updatedAt: data.updated_at
+        };
+    },
+
+    updateOrderShipping: async (orderId: string, trackingNumber: string, shippingProvider: string): Promise<Order> => {
+        const { data, error } = await supabase
+            .from('orders')
+            .update({
+                tracking_number: trackingNumber,
+                shipping_provider: shippingProvider,
+                status: OrderStatus.Shipped,
+                shipped_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', orderId)
+            .select('*, product:products(*), buyer:profiles!buyer_id(*), seller:profiles!seller_id(*)')
+            .single();
+
+        if (error) throw error;
+        return {
+            id: data.id,
+            product: mapProductToApp(data.product),
+            buyer: mapProfileToUser(data.buyer),
+            seller: mapProfileToUser(data.seller),
+            status: data.status as OrderStatus,
+            totalAmount: Number(data.total_amount),
+            shippingFee: Number(data.shipping_fee),
+            buyerProtectionFee: Number(data.buyer_protection_fee),
+            trackingNumber: data.tracking_number,
+            shippingProvider: data.shipping_provider,
+            shippedAt: data.shipped_at,
+            deliveredAt: data.delivered_at,
             createdAt: data.created_at,
             updatedAt: data.updated_at
         };
@@ -506,6 +558,53 @@ const api = {
 
         if (error) throw error;
         return mapProfileToUser(data);
+    },
+
+    getDisputes: async (): Promise<Dispute[]> => {
+        const { data, error } = await supabase
+            .from('disputes')
+            .select(`
+                *,
+                initiator:profiles!initiator_id(*)
+            `)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data.map(mapDisputeToApp);
+    },
+
+    createDispute: async (dispute: Omit<Dispute, 'id' | 'status' | 'createdAt'>): Promise<Dispute> => {
+        const { data, error } = await supabase
+            .from('disputes')
+            .insert({
+                order_id: dispute.orderId,
+                initiator_id: dispute.initiator.id,
+                reason: dispute.reason,
+                description: dispute.description
+            })
+            .select(`
+                *,
+                initiator:profiles(*)
+            `)
+            .single();
+
+        if (error) throw error;
+        return mapDisputeToApp(data);
+    },
+
+    updateDisputeStatus: async (disputeId: string, status: DisputeStatus, resolution?: string): Promise<Dispute> => {
+        const { data, error } = await supabase
+            .from('disputes')
+            .update({ status, resolution, updated_at: new Date().toISOString() })
+            .eq('id', disputeId)
+            .select(`
+                *,
+                initiator:profiles(*)
+            `)
+            .single();
+
+        if (error) throw error;
+        return mapDisputeToApp(data);
     }
 };
 
