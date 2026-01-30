@@ -1,252 +1,277 @@
 
+import { supabase } from './supabase';
 import type { Product, User, Review, Transaction, Conversation, Message, Order } from '../types';
-import { mockProducts, mockUsers as initialMockUsers, mockReviews, mockTransactions, mockOrders as initialMockOrders } from '../constants';
-import { OrderStatus } from '../types';
+import { ProductStatus, OrderStatus, TransactionType, TransactionStatus } from '../types';
 
-// This file simulates a backend API.
-// In a real application, these functions would make network requests (e.g., using fetch).
+// Utility to convert Supabase row to our app types
+const mapProfileToUser = (profile: any): User => ({
+    id: profile.id,
+    name: profile.name,
+    avatarUrl: profile.avatar_url || `https://picsum.photos/seed/${profile.id}/100/100`,
+    city: profile.city || 'Inconnue',
+    rating: Number(profile.rating) || 0,
+    reviews: profile.reviews || 0,
+    memberSince: new Date(profile.member_since).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
+    isAdmin: profile.is_admin,
+    balance: Number(profile.balance) || 0,
+    isPro: profile.is_pro,
+    proSubscriptionExpires: profile.pro_subscription_expires
+});
 
-// Make mock data mutable for auth simulations
-let mockUsers: User[] = [...initialMockUsers];
-let mockOrders: Order[] = [...initialMockOrders];
-
-const socialUserGoogle: User = { id: 'u-google', name: 'Amine Google', avatarUrl: 'https://picsum.photos/seed/u-google/100/100', city: 'Casablanca', rating: 4.2, reviews: 5, memberSince: "Aujourd'hui", balance: 50.00, isPro: false };
-const socialUserFacebook: User = { id: 'u-facebook', name: 'Leila Facebook', avatarUrl: 'https://picsum.photos/seed/u-facebook/100/100', city: 'Rabat', rating: 4.9, reviews: 22, memberSince: "Aujourd'hui", balance: 120.00, isPro: false };
-
-let mockConversations: Conversation[] = [
-    {
-        id: 'c1',
-        participants: [initialMockUsers[0], initialMockUsers.find(u => u.id === 'admin')!],
-        product: mockProducts[7],
-        messages: [
-            { id: 'm1', senderId: 'admin', text: 'Bonjour, vos babouches sont-elles toujours disponibles ?', timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
-            { id: 'm2', senderId: 'u1', text: 'Oui, toujours !', timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString() },
-        ],
-        lastMessageTimestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-        id: 'c2',
-        participants: [initialMockUsers[1], initialMockUsers.find(u => u.id === 'admin')!],
-        product: mockProducts[4],
-        messages: [
-            { id: 'm3', senderId: 'admin', text: 'Salam, le jeu est en bon état ? Pas de rayures ?', timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() },
-        ],
-        lastMessageTimestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    }
-];
+const mapProductToApp = (p: any): Product => ({
+    id: p.id,
+    title: p.title,
+    description: p.description,
+    price: Number(p.price),
+    originalPrice: p.original_price ? Number(p.original_price) : undefined,
+    category: p.category as any,
+    condition: p.condition as any,
+    size: p.size,
+    city: p.city,
+    images: p.images || [],
+    seller: p.profiles ? mapProfileToUser(p.profiles) : (p.seller ? mapProfileToUser(p.seller) : {} as User),
+    status: p.status as ProductStatus,
+    isFeatured: p.is_featured,
+    boostedUntil: p.boosted_until
+});
 
 const api = {
-  // PRODUCT & GENERAL API
-  getProducts: (): Promise<Product[]> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(mockProducts)
-      }, 500); // Simulate network delay
-    });
-  },
+    // STORAGE API
+    uploadImage: async (file: File, userId: string): Promise<string> => {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${userId}/${Date.now()}.${fileExt}`;
+        const filePath = `${fileName}`;
 
-  getUsers: (): Promise<User[]> => {
-     return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(mockUsers)
-      }, 500);
-    });
-  },
+        const { error: uploadError } = await supabase.storage
+            .from('products')
+            .upload(filePath, file);
 
-  getReviews: (): Promise<Review[]> => {
-     return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(mockReviews)
-      }, 500);
-    });
-  },
-  
-  getTransactions: (): Promise<Transaction[]> => {
-     return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(mockTransactions)
-      }, 500);
-    });
-  },
+        if (uploadError) throw uploadError;
 
-  getOrders: (): Promise<Order[]> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(mockOrders)
-      }, 500);
-    });
-  },
+        const { data } = supabase.storage
+            .from('products')
+            .getPublicUrl(filePath);
 
-  createOrder: (product: Product, buyer: User, buyerProtectionFee: number, shippingFee: number, totalAmount: number): Promise<Order> => {
-     return new Promise((resolve) => {
-        setTimeout(() => {
-            const newOrder: Order = {
-                id: `o${Date.now()}`,
-                product,
-                buyer,
-                seller: product.seller,
-                status: OrderStatus.Paid,
-                totalAmount,
-                buyerProtectionFee,
-                shippingFee,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            };
-            mockOrders.unshift(newOrder);
-            resolve(newOrder);
-        }, 1000); // Simulate payment processing
-     });
-  },
+        return data.publicUrl;
+    },
 
-  // AUTH API
-  login: (email: string, password: string): Promise<User> => {
-      console.log('Attempting login for:', email);
-      return new Promise((resolve, reject) => {
-          setTimeout(() => {
-              // Special check for admin user
-              if (email === 'admin@diali.closet') {
-                  if (password === 'admin123') {
-                      const adminUser = mockUsers.find(u => u.id === 'admin');
-                      if (adminUser) {
-                          resolve(adminUser);
-                          return;
-                      }
-                  } else {
-                      reject(new Error('Mot de passe administrateur incorrect.'));
-                      return;
-                  }
-              }
+    // PRODUCT API
+    getProducts: async (): Promise<Product[]> => {
+        const { data, error } = await supabase
+            .from('products')
+            .select('*, profiles(*)')
+            .order('created_at', { ascending: false });
 
-              // In a real app, you'd check a hashed password. Here we mock it.
-              // We don't have emails, so let's pretend the user ID is the email prefix.
-              const foundUser = mockUsers.find(u => `${u.id}@diali.closet` === email);
-              if (foundUser) {
-                  resolve(foundUser);
-              } else {
-                  reject(new Error('Email ou mot de passe incorrect.'));
-              }
-          }, 1000);
-      });
-  },
+        if (error) throw error;
+        return (data || []).map(mapProductToApp);
+    },
 
-  signup: (name: string, email: string, password: string): Promise<User> => {
-      return new Promise((resolve, reject) => {
-          setTimeout(() => {
-               const emailExists = mockUsers.some(u => `${u.id}@diali.closet` === email);
-               if (emailExists) {
-                   reject(new Error('Un compte avec cet email existe déjà.'));
-                   return;
-               }
+    addProduct: async (productData: Omit<Product, 'id' | 'seller' | 'status'>, sellerId: string): Promise<Product> => {
+        const { data, error } = await supabase
+            .from('products')
+            .insert({
+                title: productData.title,
+                description: productData.description,
+                price: productData.price,
+                original_price: productData.originalPrice,
+                category: productData.category,
+                condition: productData.condition,
+                size: productData.size,
+                city: productData.city,
+                images: productData.images,
+                seller_id: sellerId,
+                status: ProductStatus.Pending
+            })
+            .select('*, profiles(*)')
+            .single();
 
-               const newUser: User = {
-                   id: `u${mockUsers.length + 5}`, // create a new unique ID
-                   name,
-                   avatarUrl: `https://picsum.photos/seed/u-new-${name}/100/100`,
-                   city: 'Inconnue',
-                   rating: 0,
-                   reviews: 0,
-                   memberSince: new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
-                   balance: 0,
-                   isPro: false,
-               };
-               mockUsers.push(newUser);
-               resolve(newUser);
-          }, 1000);
-      });
-  },
-  
-  loginWithGoogle: (): Promise<User> => {
-      return new Promise((resolve) => {
-          setTimeout(() => {
-              if (!mockUsers.some(u => u.id === socialUserGoogle.id)) {
-                  mockUsers.push(socialUserGoogle);
-              }
-              resolve(socialUserGoogle);
-          }, 800);
-      })
-  },
+        if (error) throw error;
+        return mapProductToApp(data);
+    },
 
-  loginWithFacebook: (): Promise<User> => {
-      return new Promise((resolve) => {
-          setTimeout(() => {
-              if (!mockUsers.some(u => u.id === socialUserFacebook.id)) {
-                  mockUsers.push(socialUserFacebook);
-              }
-              resolve(socialUserFacebook);
-          }, 800);
-      })
-  },
+    updateProduct: async (product: Product): Promise<Product> => {
+        const { data, error } = await supabase
+            .from('products')
+            .update({
+                title: product.title,
+                description: product.description,
+                price: product.price,
+                original_price: product.originalPrice,
+                category: product.category,
+                condition: product.condition,
+                size: product.size,
+                city: product.city,
+                images: product.images,
+                status: product.status,
+                is_featured: product.isFeatured,
+                boosted_until: product.boostedUntil
+            })
+            .eq('id', product.id)
+            .select('*, profiles(*)')
+            .single();
 
-  getUserById: (userId: string): Promise<User> => {
-      return new Promise((resolve, reject) => {
-          setTimeout(() => {
-              const allUsers = [...mockUsers, socialUserGoogle, socialUserFacebook];
-              const user = allUsers.find(u => u.id === userId);
-              if (user) {
-                  resolve(user);
-              } else {
-                  reject(new Error('User not found'));
-              }
-          }, 200);
-      });
-  },
-  
-  // CHAT API
-  getConversationsForUser: (userId: string): Promise<Conversation[]> => {
-      return new Promise((resolve) => {
-          setTimeout(() => {
-              const conversations = mockConversations
-                  .filter(c => c.participants.some(p => p.id === userId))
-                  .sort((a, b) => new Date(b.lastMessageTimestamp).getTime() - new Date(a.lastMessageTimestamp).getTime());
-              resolve(conversations);
-          }, 500);
-      });
-  },
-  
-  sendMessage: (conversationId: string, text: string, senderId: string): Promise<Message> => {
-      return new Promise((resolve, reject) => {
-          setTimeout(() => {
-              const conversation = mockConversations.find(c => c.id === conversationId);
-              if (conversation) {
-                  const newMessage: Message = {
-                      id: `m${Date.now()}`,
-                      senderId,
-                      text,
-                      timestamp: new Date().toISOString()
-                  };
-                  conversation.messages.push(newMessage);
-                  conversation.lastMessageTimestamp = newMessage.timestamp;
-                  resolve(newMessage);
-              } else {
-                  reject(new Error("Conversation not found"));
-              }
-          }, 300);
-      });
-  },
+        if (error) throw error;
+        return mapProductToApp(data);
+    },
 
-  findOrCreateConversation: (user1: User, user2: User, product: Product): Promise<Conversation> => {
-      return new Promise((resolve) => {
-          setTimeout(() => {
-              let conversation = mockConversations.find(c => 
-                  c.product.id === product.id &&
-                  c.participants.some(p => p.id === user1.id) &&
-                  c.participants.some(p => p.id === user2.id)
-              );
+    deleteProduct: async (productId: string): Promise<void> => {
+        const { error } = await supabase
+            .from('products')
+            .delete()
+            .eq('id', productId);
+        if (error) throw error;
+    },
 
-              if (!conversation) {
-                  conversation = {
-                      id: `c${Date.now()}`,
-                      participants: [user1, user2],
-                      product: product,
-                      messages: [],
-                      lastMessageTimestamp: new Date().toISOString(),
-                  };
-                  mockConversations.unshift(conversation);
-              }
-              resolve(conversation);
-          }, 200);
-      });
-  }
+    // AUTH API
+    getCurrentUser: async (): Promise<User | null> => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return null;
+
+        const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+
+        if (error) return null;
+        return mapProfileToUser(profile);
+    },
+
+    login: async (email: string, password: string): Promise<User> => {
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+            email,
+            password
+        });
+        if (authError) throw authError;
+
+        const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', authData.user.id)
+            .single();
+
+        if (profileError) throw profileError;
+        return mapProfileToUser(profile);
+    },
+
+    signup: async (name: string, email: string, password: string): Promise<User> => {
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+                data: { name }
+            }
+        });
+        if (authError) throw authError;
+        if (!authData.user) throw new Error("Erreur lors de la création du compte.");
+
+        // Wait for profile trigger
+        await new Promise(r => setTimeout(r, 1000));
+
+        const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', authData.user.id)
+            .single();
+
+        if (profileError) throw profileError;
+        return mapProfileToUser(profile);
+    },
+
+    logout: async () => {
+        await supabase.auth.signOut();
+    },
+
+    // CHAT API
+    getConversationsForUser: async (userId: string): Promise<Conversation[]> => {
+        const { data, error } = await supabase
+            .from('conversations')
+            .select(`
+                *,
+                product:products(*, profiles(*)),
+                participants:conversation_participants(profiles(*)),
+                messages(*)
+            `)
+            .order('last_message_timestamp', { ascending: false });
+
+        if (error) throw error;
+
+        return (data || []).map(c => ({
+            id: c.id,
+            product: mapProductToApp(c.product),
+            participants: c.participants.map((p: any) => mapProfileToUser(p.profiles)),
+            messages: (c.messages || []).map((m: any) => ({
+                id: m.id,
+                senderId: m.sender_id,
+                text: m.text,
+                timestamp: m.timestamp
+            })).sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()),
+            lastMessageTimestamp: c.last_message_timestamp
+        }));
+    },
+
+    sendMessage: async (conversationId: string, text: string, senderId: string): Promise<Message> => {
+        const { data, error } = await supabase
+            .from('messages')
+            .insert({ conversation_id: conversationId, sender_id: senderId, text })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        await supabase
+            .from('conversations')
+            .update({ last_message_timestamp: data.timestamp })
+            .eq('id', conversationId);
+
+        return {
+            id: data.id,
+            senderId: data.sender_id,
+            text: data.text,
+            timestamp: data.timestamp
+        };
+    },
+
+    findOrCreateConversation: async (currentUser: User, recipient: User, product: Product): Promise<Conversation> => {
+        const { data: existingConvs, error: findError } = await supabase
+            .from('conversations')
+            .select(`
+                id,
+                product_id,
+                participants:conversation_participants!inner(user_id)
+            `)
+            .eq('product_id', product.id);
+
+        if (findError) throw findError;
+
+        const conversation = (existingConvs || []).find(c =>
+            c.participants.some(p => p.user_id === currentUser.id) &&
+            c.participants.some(p => p.user_id === recipient.id)
+        );
+
+        if (conversation) {
+            const convs = await api.getConversationsForUser(currentUser.id);
+            return convs.find(c => c.id === conversation.id)!;
+        }
+
+        const { data: newConv, error: createError } = await supabase
+            .from('conversations')
+            .insert({ product_id: product.id })
+            .select()
+            .single();
+
+        if (createError) throw createError;
+
+        await supabase
+            .from('conversation_participants')
+            .insert([
+                { conversation_id: newConv.id, user_id: currentUser.id },
+                { conversation_id: newConv.id, user_id: recipient.id }
+            ]);
+
+        const convs = await api.getConversationsForUser(currentUser.id);
+        return convs.find(c => c.id === newConv.id)!;
+    }
 };
 
 export default api;

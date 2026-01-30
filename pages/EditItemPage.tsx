@@ -24,7 +24,7 @@ const EditItemPage: React.FC<EditItemPageProps> = ({ product, onUpdateItem, onCa
   const [size, setSize] = useState(product.size || '');
   const [city, setCity] = useState(product.city);
   const [images, setImages] = useState<string[]>(product.images);
-  
+
   const dragItem = useRef<number | null>(null);
   const dragOverItem = useRef<number | null>(null);
 
@@ -33,7 +33,7 @@ const EditItemPage: React.FC<EditItemPageProps> = ({ product, onUpdateItem, onCa
   useEffect(() => {
     // Reset size if the selected category changes and the current size is no longer valid
     if (size && (!availableSizes || !availableSizes.includes(size))) {
-        setSize('');
+      setSize('');
     }
   }, [category, size, availableSizes]);
 
@@ -65,21 +65,21 @@ const EditItemPage: React.FC<EditItemPageProps> = ({ product, onUpdateItem, onCa
   const handleRemoveImage = (indexToRemove: number) => {
     setImages(images.filter((_, index) => index !== indexToRemove));
   };
-  
+
   const handleDragSort = () => {
     if (dragItem.current === null || dragOverItem.current === null || dragItem.current === dragOverItem.current) return;
-    
+
     const newImages = [...images];
     const draggedItemContent = newImages.splice(dragItem.current, 1)[0];
     newImages.splice(dragOverItem.current, 0, draggedItemContent);
-    
+
     dragItem.current = null;
     dragOverItem.current = null;
-    
+
     setImages(newImages);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !price || !city || !category) {
       alert("Veuillez remplir tous les champs obligatoires.");
@@ -95,11 +95,11 @@ const EditItemPage: React.FC<EditItemPageProps> = ({ product, onUpdateItem, onCa
       condition,
       size: size || undefined,
       city,
-      images: images.length > 0 ? images : ['https://picsum.photos/seed/newitem/600/800'], // Placeholder if no image
+      images: images.length > 0 ? images : ['https://picsum.photos/seed/newitem/600/800'],
     };
     onUpdateItem(updatedProduct);
   };
-  
+
   const commonInputClasses = "mt-1 block w-full px-3 py-2 bg-inherit border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary";
   const commonSelectClasses = "mt-1 block w-full pl-3 pr-10 py-2 bg-inherit border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary";
 
@@ -122,31 +122,31 @@ const EditItemPage: React.FC<EditItemPageProps> = ({ product, onUpdateItem, onCa
                 <p className="text-xs text-text-light dark:text-gray-500">PNG, JPG, GIF, WebP (max 5MB)</p>
               </div>
             </div>
-             {images.length > 0 && (
-                <div className="mt-4 grid grid-cols-3 sm:grid-cols-5 gap-4">
-                    {images.map((img, i) => (
-                        <div 
-                            key={i} 
-                            className="relative group cursor-grab"
-                            draggable
-                            onDragStart={() => (dragItem.current = i)}
-                            onDragEnter={() => (dragOverItem.current = i)}
-                            onDragEnd={handleDragSort}
-                            onDragOver={(e) => e.preventDefault()}
-                        >
-                            <img src={img} className="h-24 w-24 object-cover rounded-lg" alt="preview"/>
-                            <button 
-                                type="button" 
-                                onClick={() => handleRemoveImage(i)}
-                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full h-6 w-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                                aria-label="Supprimer l'image"
-                            >&times;</button>
-                        </div>
-                    ))}
-                </div>
-             )}
+            {images.length > 0 && (
+              <div className="mt-4 grid grid-cols-3 sm:grid-cols-5 gap-4">
+                {images.map((img, i) => (
+                  <div
+                    key={i}
+                    className="relative group cursor-grab"
+                    draggable
+                    onDragStart={() => (dragItem.current = i)}
+                    onDragEnter={() => (dragOverItem.current = i)}
+                    onDragEnd={handleDragSort}
+                    onDragOver={(e) => e.preventDefault()}
+                  >
+                    <img src={img} className="h-24 w-24 object-cover rounded-lg" alt="preview" />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveImage(i)}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full h-6 w-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                      aria-label="Supprimer l'image"
+                    >&times;</button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-          
+
           <div>
             <label htmlFor="title" className="block text-sm font-medium text-text-main dark:text-secondary">Titre</label>
             <input type="text" id="title" value={title} onChange={(e) => setTitle(e.target.value)} className={commonInputClasses} placeholder="ex: Robe d'été fleurie" required />
@@ -181,11 +181,10 @@ const EditItemPage: React.FC<EditItemPageProps> = ({ product, onUpdateItem, onCa
                     type="button"
                     key={s}
                     onClick={() => setSize(s === size ? '' : s)} // Allow deselecting
-                    className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
-                      size === s
+                    className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${size === s
                         ? 'bg-primary text-white border-primary'
                         : 'bg-transparent border-gray-300 dark:border-gray-600 hover:border-primary hover:text-primary dark:hover:text-primary'
-                    }`}
+                      }`}
                   >
                     {s}
                   </button>
@@ -193,26 +192,26 @@ const EditItemPage: React.FC<EditItemPageProps> = ({ product, onUpdateItem, onCa
               </div>
             </div>
           )}
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label htmlFor="price" className="block text-sm font-medium text-text-main dark:text-secondary">Prix de vente (MAD)</label>
               <input type="number" id="price" value={price} onChange={(e) => setPrice(e.target.value)} className={commonInputClasses} placeholder="ex: 150" required />
             </div>
-             <div>
+            <div>
               <label htmlFor="originalPrice" className="block text-sm font-medium text-text-main dark:text-secondary">Prix d'origine (Optionnel)</label>
               <input type="number" id="originalPrice" value={originalPrice} onChange={(e) => setOriginalPrice(e.target.value)} className={commonInputClasses} placeholder="ex: 250" />
             </div>
           </div>
 
-           <div>
-              <label htmlFor="city" className="block text-sm font-medium text-text-main dark:text-secondary">Ville</label>
-              <select id="city" value={city} onChange={(e) => setCity(e.target.value)} className={commonSelectClasses} required>
-                <option value="">Sélectionnez une ville</option>
-                {moroccanCities.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-          
+          <div>
+            <label htmlFor="city" className="block text-sm font-medium text-text-main dark:text-secondary">Ville</label>
+            <select id="city" value={city} onChange={(e) => setCity(e.target.value)} className={commonSelectClasses} required>
+              <option value="">Sélectionnez une ville</option>
+              {moroccanCities.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
           <div className="flex justify-end space-x-4 pt-4">
             <Button type="button" variant="ghost" onClick={onCancel} className="h-10 px-6">
               Annuler
