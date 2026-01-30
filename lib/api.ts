@@ -1,11 +1,15 @@
-import type { Product, User, Review, Transaction, Conversation, Message } from './types';
-import { mockProducts, mockUsers as initialMockUsers, mockReviews, mockTransactions } from '../constants';
+
+import type { Product, User, Review, Transaction, Conversation, Message, Order } from '../types';
+import { mockProducts, mockUsers as initialMockUsers, mockReviews, mockTransactions, mockOrders as initialMockOrders } from '../constants';
+import { OrderStatus } from '../types';
 
 // This file simulates a backend API.
 // In a real application, these functions would make network requests (e.g., using fetch).
 
 // Make mock data mutable for auth simulations
 let mockUsers: User[] = [...initialMockUsers];
+let mockOrders: Order[] = [...initialMockOrders];
+
 const socialUserGoogle: User = { id: 'u-google', name: 'Amine Google', avatarUrl: 'https://picsum.photos/seed/u-google/100/100', city: 'Casablanca', rating: 4.2, reviews: 5, memberSince: "Aujourd'hui", balance: 50.00, isPro: false };
 const socialUserFacebook: User = { id: 'u-facebook', name: 'Leila Facebook', avatarUrl: 'https://picsum.photos/seed/u-facebook/100/100', city: 'Rabat', rating: 4.9, reviews: 22, memberSince: "Aujourd'hui", balance: 120.00, isPro: false };
 
@@ -63,6 +67,35 @@ const api = {
         resolve(mockTransactions)
       }, 500);
     });
+  },
+
+  getOrders: (): Promise<Order[]> => {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve(mockOrders)
+      }, 500);
+    });
+  },
+
+  createOrder: (product: Product, buyer: User, buyerProtectionFee: number, shippingFee: number, totalAmount: number): Promise<Order> => {
+     return new Promise((resolve) => {
+        setTimeout(() => {
+            const newOrder: Order = {
+                id: `o${Date.now()}`,
+                product,
+                buyer,
+                seller: product.seller,
+                status: OrderStatus.Paid,
+                totalAmount,
+                buyerProtectionFee,
+                shippingFee,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            };
+            mockOrders.unshift(newOrder);
+            resolve(newOrder);
+        }, 1000); // Simulate payment processing
+     });
   },
 
   // AUTH API

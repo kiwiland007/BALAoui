@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import type { User, Conversation, View } from '../types';
 import ChatList from '../components/ChatList';
@@ -24,7 +23,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, conversations, onNavig
     if (initialConversationId) {
       setActiveConversationId(initialConversationId);
     } else if (conversations.length > 0 && !activeConversationId) {
-      setActiveConversationId(conversations[0].id);
+      // setActiveConversationId(conversations[0].id);
+      // Let user select conversation on desktop
     }
   }, [initialConversationId, conversations, activeConversationId]);
 
@@ -47,7 +47,11 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, conversations, onNavig
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold text-text-main dark:text-secondary mb-6">Messagerie</h1>
       <Card className="h-[75vh] flex overflow-hidden">
-        <div className="w-full md:w-1/3 border-r border-gray-200 dark:border-gray-700 flex flex-col">
+        {/* Chat List */}
+        <div className={`
+          w-full md:w-1/3 border-r border-gray-200 dark:border-gray-700 flex flex-col
+          ${activeConversationId ? 'hidden md:flex' : 'flex'}
+        `}>
           <ChatList
             conversations={conversations}
             currentUser={currentUser}
@@ -56,12 +60,20 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, conversations, onNavig
             isLoading={isConversationsLoading}
           />
         </div>
-        <div className="hidden md:w-2/3 md:flex flex-col">
+        
+        {/* Message View */}
+        <div className={`
+          w-full md:w-2/3 flex-col
+          ${activeConversationId ? 'flex' : 'hidden md:flex'}
+        `}>
           {activeConversation && otherParticipant ? (
             <>
               {/* Chat Header */}
               <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
                 <div className="flex items-center space-x-3">
+                  <Button variant="ghost" className="md:hidden w-10 h-10 p-0" onClick={() => setActiveConversationId(null)}>
+                     <i className="fa-solid fa-arrow-left text-lg"></i>
+                  </Button>
                   <img src={otherParticipant.avatarUrl} alt={otherParticipant.name} className="w-10 h-10 rounded-full" />
                   <div>
                     <p className="font-semibold text-text-main dark:text-secondary">{otherParticipant.name}</p>
@@ -70,7 +82,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, conversations, onNavig
                     </p>
                   </div>
                 </div>
-                <Button variant="ghost" onClick={() => onNavigate({ name: 'profile', user: otherParticipant })}>
+                <Button variant="ghost" className="hidden sm:inline-flex" onClick={() => onNavigate({ name: 'profile', user: otherParticipant })}>
                     Voir le profil
                 </Button>
               </div>

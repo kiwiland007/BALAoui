@@ -1,24 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 import React, { useState, useMemo } from 'react';
 import type { View, Product, User, Transaction } from '../types';
 import type { AppSettings, AppContent } from '../App';

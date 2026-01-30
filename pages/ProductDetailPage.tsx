@@ -1,32 +1,37 @@
-
 import React, { useState, useRef } from 'react';
 import type { Product, User } from '../types';
+import type { AppSettings } from '../App';
 import Rating from '../components/Rating';
 import ImageZoomModal from '../components/ImageZoomModal';
-import PurchaseModal from '../components/PurchaseModal';
+import CheckoutModal from '../components/CheckoutModal';
 import ShareModal from '../components/ShareModal';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import ProductCard from '../components/ProductCard';
+import { ProductStatus } from '../types';
+
 
 interface ProductDetailPageProps {
   product: Product;
   allProducts: Product[];
   savedItems: Set<string>;
+  cartItems: Set<string>;
   onBack: () => void;
   onSellerClick: (seller: User) => void;
   onProductSelect: (product: Product) => void;
   onToggleSave: (productId: string) => void;
-  onPurchase: (product: Product) => void;
+  onAddToCart: (productId: string) => void;
+  onPurchase: (product: Product, buyerProtectionFee: number, shippingFee: number, totalAmount: number) => void;
   currentUser: User | null;
   onReportProduct: (product: Product) => void;
   onMessageSeller: (recipient: User, product: Product) => void;
   showToast: (message: string, icon: string) => void;
+  appSettings: AppSettings;
 }
 
-const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ product, allProducts, savedItems, onBack, onSellerClick, onProductSelect, onToggleSave, onPurchase, currentUser, onReportProduct, onMessageSeller, showToast }) => {
+const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ product, allProducts, savedItems, cartItems, onBack, onSellerClick, onProductSelect, onToggleSave, onAddToCart, onPurchase, currentUser, onReportProduct, onMessageSeller, showToast, appSettings }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isPurchasing, setIsPurchasing] = useState(false);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [isSharingInProgress, setIsSharingInProgress] = useState(false);
@@ -38,15 +43,17 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ product, allProdu
   const discountPercentage = isDeal ? Math.round(((product.originalPrice! - product.price) / product.originalPrice!) * 100) : 0;
   
   const isSaved = savedItems.has(product.id);
+  const isInCart = cartItems.has(product.id);
   const isOwner = currentUser?.id === product.seller.id;
+  const isSold = product.status === ProductStatus.Sold;
 
   const similarProducts = allProducts
     .filter(p => p.category === product.category && p.id !== product.id)
     .slice(0, 8);
     
-  const handleConfirmPurchase = () => {
-    setIsPurchasing(false);
-    onPurchase(product);
+  const handleConfirmPurchase = (product: Product, buyerProtectionFee: number, shippingFee: number, totalAmount: number) => {
+    setIsCheckoutOpen(false);
+    onPurchase(product, buyerProtectionFee, shippingFee, totalAmount);
   }
 
   const handleShare = async () => {
@@ -78,11 +85,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ product, allProdu
       // Fallback for browsers that don't support the Web Share API
       setIsSharing(true);
     }
-  };
-
-  const handleAddToCart = () => {
-    showToast("Article ajouté au panier !", "fa-solid fa-cart-plus");
-    // In a real app, we'd also update the cart state here.
   };
 
   const goToNext = () => {
@@ -118,7 +120,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ product, allProdu
 
   return (
     <div className="container mx-auto px-4 py-8">
-      {isPurchasing && <PurchaseModal product={product} onClose={() => setIsPurchasing(false)} onConfirm={handleConfirmPurchase} />}
+      {isCheckoutOpen && <CheckoutModal product={product} appSettings={appSettings} onClose={() => setIsCheckoutOpen(false)} onConfirmPurchase={handleConfirmPurchase} currentUser={currentUser} />}
       {isSharing && <ShareModal product={product} onClose={() => setIsSharing(false)} />}
       {zoomedImage && <ImageZoomModal imageUrl={zoomedImage} onClose={() => setZoomedImage(null)} />}
       
@@ -136,6 +138,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ product, allProdu
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
           >
+            {isSold && (
+                <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
+                    <span className="text-white text-3xl font-bold border-4 border-white px-6 py-3 -rotate-12">VENDU</span>
+                </div>
+            )}
             <div className="flex transition-transform duration-500 ease-in-out" style={{ transform: `translateX(-${currentIndex * 100}%)` }}>
                 {product.images.map((img, index) => (
                     <div key={index} className="flex-shrink-0 w-full h-[32rem] relative" onClick={() => setZoomedImage(img)}>
@@ -169,7 +176,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ product, allProdu
              {/* Mobile Dots */}
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-2 md:hidden">
                 {product.images.map((_, index) => (
-                    <div key={index} className={`w-2 h-2 rounded-full ${index === currentIndex ? 'bg-primary' : 'bg-gray-300'}`}></div>
+                    <div key={index} className={`w-2 h-2 rounded-full transition-all duration-300 ${index === currentIndex ? 'bg-primary scale-125' : 'bg-gray-300'}`}></div>
                 ))}
             </div>
           </div>
@@ -222,28 +229,36 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ product, allProdu
             </div>
             
             {/* Action Buttons */}
-            <div className="mt-6 flex flex-col sm:flex-row gap-3">
-                {!isOwner ? (
-                    <>
-                        <Button className="flex-1 h-12" onClick={() => setIsPurchasing(true)}>
-                            <i className="fa-solid fa-bolt mr-2"></i>Acheter
-                        </Button>
-                        <Button variant="outline" className="flex-1 h-12" onClick={handleAddToCart}>
-                            <i className="fa-solid fa-cart-plus mr-2"></i>Ajouter au panier
-                        </Button>
-                        <Button variant="outline" className="flex-1 h-12" onClick={() => onMessageSeller(product.seller, product)}>
-                            <i className="fa-regular fa-comments mr-2"></i>Contacter le vendeur
-                        </Button>
-                    </>
-                ) : (
-                    <Button variant="outline" className="flex-1 h-12" disabled>C'est votre article</Button>
-                )}
-                <Button variant="ghost" className="h-12 w-12 sm:w-auto" onClick={() => onToggleSave(product.id)} aria-label="Sauvegarder">
-                    <i className={`${isSaved ? 'fa-solid text-red-500' : 'fa-regular'} fa-heart text-xl`}></i>
-                </Button>
-                <Button variant="ghost" className="h-12 w-12 sm:w-auto" onClick={handleShare} aria-label="Partager" disabled={isSharingInProgress}>
-                    <i className="fa-solid fa-share-nodes text-xl"></i>
-                </Button>
+            <div className="mt-6">
+                <div className="flex flex-col sm:flex-row gap-3">
+                    {!isOwner ? (
+                        isSold ? (
+                            <Button variant="outline" className="flex-1 h-12" disabled>Cet article a été vendu</Button>
+                        ) : (
+                            <>
+                                <Button className="flex-1 h-12" onClick={() => setIsCheckoutOpen(true)}>
+                                    <i className="fa-solid fa-shield-halved mr-2"></i>Acheter
+                                </Button>
+                                <Button variant="outline" className="h-12 w-16" onClick={() => onAddToCart(product.id)} disabled={isInCart} aria-label="Ajouter au panier">
+                                    <i className={`fa-solid ${isInCart ? 'fa-check' : 'fa-cart-plus'} text-xl`}></i>
+                                </Button>
+                            </>
+                        )
+                    ) : (
+                        <Button variant="outline" className="flex-1 h-12" disabled>C'est votre article</Button>
+                    )}
+                    <Button variant="ghost" className="h-12 w-12 sm:w-auto" onClick={() => onToggleSave(product.id)} aria-label="Sauvegarder">
+                        <i className={`${isSaved ? 'fa-solid text-red-500' : 'fa-regular'} fa-heart text-xl`}></i>
+                    </Button>
+                    <Button variant="ghost" className="h-12 w-12 sm:w-auto" onClick={handleShare} aria-label="Partager" disabled={isSharingInProgress}>
+                        <i className="fa-solid fa-share-nodes text-xl"></i>
+                    </Button>
+                </div>
+                 {!isOwner && !isSold && (
+                    <Button variant="outline" className="w-full mt-3 h-12" onClick={() => onMessageSeller(product.seller, product)}>
+                        <i className="fa-regular fa-comments mr-2"></i>Contacter le vendeur
+                    </Button>
+                 )}
             </div>
         </div>
       </div>

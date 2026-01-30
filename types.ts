@@ -1,4 +1,3 @@
-
 export enum ProductCategory {
   // --- FEMME ---
   // Vêtements
@@ -66,6 +65,7 @@ export enum ProductStatus {
     Pending = "En attente",
     Approved = "Approuvé",
     Rejected = "Rejeté",
+    Sold = "Vendu",
 }
 
 export enum TransactionType {
@@ -74,11 +74,22 @@ export enum TransactionType {
     Sale = "Vente finalisée",
     Deposit = "Dépôt de solde",
     Subscription = "Abonnement Pro",
+    BuyerProtection = "Protection Acheteurs",
 }
 
 export enum TransactionStatus {
     Completed = "Terminée",
     Pending = "En attente",
+}
+
+export enum OrderStatus {
+    PendingPayment = "Paiement en attente",
+    Paid = "Payée",
+    Shipped = "Expédiée",
+    Delivered = "Livrée",
+    Completed = "Terminée",
+    Cancelled = "Annulée",
+    Disputed = "En litige",
 }
 
 export interface User {
@@ -130,6 +141,20 @@ export interface Transaction {
     status: TransactionStatus;
 }
 
+export interface Order {
+    id: string;
+    product: Product;
+    buyer: User;
+    seller: User;
+    status: OrderStatus;
+    totalAmount: number;
+    shippingFee: number;
+    buyerProtectionFee: number;
+    trackingNumber?: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
 export interface Message {
     id: string;
     senderId: string;
@@ -156,4 +181,6 @@ export type View =
   | { name: 'search', query: string }
   | { name: 'admin' }
   | { name: 'auth' }
+  | { name: 'orders' }
+  | { name: 'cart' }
   | { name: 'chat', conversationId?: string, recipient?: User, product?: Product };

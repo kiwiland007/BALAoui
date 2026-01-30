@@ -1,6 +1,5 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
-import type { Product, User, View, Transaction, Conversation, Message } from './types';
+import type { Product, User, View, Transaction, Conversation, Message, Order } from './types';
 import { ProductStatus, TransactionType, TransactionStatus } from './types';
 import api from './lib/api';
 import Header from './components/Header';
@@ -13,6 +12,8 @@ import SavedItemsPage from './pages/SavedItemsPage';
 import SearchResultsPage from './pages/SearchResultsPage';
 import AdminPage from './pages/AdminPage';
 import ChatPage from './pages/ChatPage';
+import OrdersPage from './pages/OrdersPage';
+import CartPage from './pages/CartPage';
 import Toast from './components/Toast';
 import SkeletonCard from './components/SkeletonCard';
 import ReportModal from './components/ReportModal';
@@ -28,6 +29,9 @@ export interface AppSettings {
   featurePrice: number;
   proSubscriptionPrice: number;
   proCommission: number;
+  buyerProtectionFeePercent: number;
+  buyerProtectionFeeFixed: number;
+  shippingFee: number;
 }
 export interface AppContent {
   logoUrl?: string;
@@ -42,8 +46,10 @@ const App: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [savedItems, setSavedItems] = useState<Set<string>>(new Set());
+  const [cartItems, setCartItems] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<ToastMessage>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [productToReport, setProductToReport] = useState<Product | null>(null);
@@ -55,6 +61,9 @@ const App: React.FC = () => {
       featurePrice: 50, // 50 MAD
       proSubscriptionPrice: 99, // 99 MAD/month
       proCommission: 2, // 2% for Pro sellers
+      buyerProtectionFeePercent: 5, // 5%
+      buyerProtectionFeeFixed: 5, // 5 MAD
+      shippingFee: 35, // 35 MAD flat rate
   });
    const [appContent, setAppContent] = useState<AppContent>({
     logoUrl: 'https://i.ibb.co/9vM9yBv/logo-no-background.png',
@@ -91,10 +100,12 @@ const App: React.FC = () => {
       api.getProducts(),
       api.getUsers(),
       api.getTransactions(),
-    ]).then(([fetchedProducts, fetchedUsers, fetchedTransactions]) => {
+      api.getOrders(),
+    ]).then(([fetchedProducts, fetchedUsers, fetchedTransactions, fetchedOrders]) => {
       setProducts(fetchedProducts);
       setUsers(fetchedUsers);
       setTransactions(fetchedTransactions);
+      setOrders(fetchedOrders);
       setIsLoading(false);
     });
   }, []);
@@ -126,6 +137,38 @@ const App: React.FC = () => {
     });
   }, []);
   
+  const handleAddToCart = useCallback((productId: string) => {
+    if (!currentUser) {
+        showToast("Veuillez vous connecter pour ajouter au panier.", "fa-solid fa-info-circle");
+        handleNavigate({ name: 'auth' });
+        return;
+    }
+    const product = products.find(p => p.id === productId);
+    if (!product || product.status === ProductStatus.Sold || product.seller.id === currentUser.id) {
+        showToast("Cet article ne peut pas être ajouté au panier.", "fa-solid fa-warning");
+        return;
+    }
+    setCartItems(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(productId)) {
+            showToast("Cet article est déjà dans votre panier.", "fa-solid fa-info-circle");
+        } else {
+            newSet.add(productId);
+            showToast("Article ajouté au panier!", "fa-solid fa-cart-plus");
+        }
+        return newSet;
+    });
+  }, [currentUser, products, handleNavigate]);
+
+  const handleRemoveFromCart = useCallback((productId: string) => {
+      setCartItems(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(productId);
+          showToast("Article retiré du panier.", "fa-solid fa-trash-can");
+          return newSet;
+      });
+  }, []);
+  
   const handleAddItem = useCallback((newProductData: Omit<Product, 'id' | 'seller' | 'status'>) => {
     if (!currentUser) {
       showToast("Vous devez être connecté pour vendre un article.", "fa-solid fa-warning");
@@ -153,15 +196,45 @@ const App: React.FC = () => {
           handleNavigate({ name: 'home' });
       }
   }, [currentUser, handleNavigate]);
+  
+  const handleCreateOrder = useCallback(async (product: Product, buyerProtectionFee: number, shippingFee: number, totalAmount: number) => {
+    if (!currentUser) {
+        showToast("Veuillez vous connecter pour acheter.", "fa-solid fa-info-circle");
+        handleNavigate({ name: 'auth' });
+        return;
+    }
+    
+    const newOrder = await api.createOrder(product, currentUser, buyerProtectionFee, shippingFee, totalAmount);
 
-  const handlePurchase = useCallback((product: Product) => {
-      if(!currentUser) {
-          showToast("Veuillez vous connecter pour acheter.", "fa-solid fa-info-circle");
-          handleNavigate({ name: 'auth' });
-          return;
-      }
-      showToast(`Votre demande d'achat pour "${product.title}" a été envoyée !`, "fa-solid fa-paper-plane");
+    setOrders(prev => [newOrder, ...prev]);
+    setProducts(prev => prev.map(p => p.id === product.id ? { ...p, status: ProductStatus.Sold } : p));
+
+    // Create related transactions
+    const saleTransaction: Transaction = {
+        id: `t${Date.now()}`,
+        date: new Date().toISOString(),
+        user: product.seller,
+        type: TransactionType.Sale,
+        product: product,
+        amount: product.price,
+        status: TransactionStatus.Pending, // Will complete when buyer confirms receipt
+    };
+    const feeTransaction: Transaction = {
+        id: `t${Date.now()+1}`,
+        date: new Date().toISOString(),
+        user: currentUser,
+        type: TransactionType.BuyerProtection,
+        product: product,
+        amount: buyerProtectionFee + shippingFee,
+        status: TransactionStatus.Completed,
+    };
+    setTransactions(prev => [saleTransaction, feeTransaction, ...prev]);
+    
+    showToast(`Votre commande pour "${product.title}" a été passée !`, "fa-solid fa-check-circle");
+    handleNavigate({ name: 'orders' });
+
   }, [currentUser, handleNavigate]);
+
 
   const handleReportSubmit = useCallback((productId: string, reason: string, details: string) => {
       console.log(`Reported product ${productId} for reason: ${reason}. Details: ${details}`);
@@ -314,9 +387,24 @@ const App: React.FC = () => {
 
   const handleSendMessage = useCallback(async (conversationId: string, text: string) => {
     if (!currentUser) return;
-    await api.sendMessage(conversationId, text, currentUser.id);
-    fetchConversations();
-  }, [currentUser, fetchConversations]);
+    const newMessage = await api.sendMessage(conversationId, text, currentUser.id);
+    setConversations(prevConvs => {
+        const convIndex = prevConvs.findIndex(c => c.id === conversationId);
+        if (convIndex === -1) return prevConvs;
+
+        const updatedConv = {
+            ...prevConvs[convIndex],
+            messages: [...prevConvs[convIndex].messages, newMessage],
+            lastMessageTimestamp: newMessage.timestamp,
+        };
+        
+        const newConvs = [...prevConvs];
+        newConvs.splice(convIndex, 1);
+        newConvs.unshift(updatedConv);
+
+        return newConvs;
+    });
+  }, [currentUser]);
 
 
   const renderView = () => {
@@ -358,11 +446,14 @@ const App: React.FC = () => {
                 onProductSelect={(product) => handleNavigate({ name: 'productDetail', product })}
                 savedItems={savedItems}
                 onToggleSave={handleToggleSave}
-                onPurchase={handlePurchase}
+                cartItems={cartItems}
+                onAddToCart={handleAddToCart}
+                onPurchase={handleCreateOrder}
                 currentUser={currentUser}
                 onReportProduct={setProductToReport}
                 onMessageSeller={handleMessageSeller}
                 showToast={showToast}
+                appSettings={appSettings}
             />;
           case 'addItem':
             return <AddItemPage onAddItem={handleAddItem} onCancel={() => handleNavigate({name: 'home'})} />;
@@ -387,6 +478,7 @@ const App: React.FC = () => {
                 onReportProduct={setProductToReport}
                 onOpenAddBalance={() => setIsAddingBalance(true)}
                 onOpenProModal={() => setIsProModalOpen(true)}
+                onNavigate={handleNavigate}
             />;
           case 'saved':
             return <SavedItemsPage 
@@ -434,6 +526,29 @@ const App: React.FC = () => {
               initialConversationId={view.conversationId}
               isConversationsLoading={isLoading}
             />;
+          case 'orders':
+            if (!currentUser) {
+              return <AuthPage onLogin={handleLogin} showToast={showToast} onNavigate={handleNavigate} logoUrl={appContent.logoUrl} />;
+            }
+            return <OrdersPage 
+              currentUser={currentUser}
+              orders={orders}
+              showToast={showToast}
+              onNavigate={handleNavigate}
+            />
+          case 'cart':
+            if (!currentUser) {
+              return <AuthPage onLogin={handleLogin} showToast={showToast} onNavigate={handleNavigate} logoUrl={appContent.logoUrl} />;
+            }
+            return <CartPage
+                currentUser={currentUser}
+                cartItems={cartItems}
+                allProducts={products}
+                onRemoveFromCart={handleRemoveFromCart}
+                onPurchase={handleCreateOrder}
+                onNavigate={handleNavigate}
+                appSettings={appSettings}
+            />
           default:
             return <div>Page not found</div>;
         }
@@ -448,6 +563,7 @@ const App: React.FC = () => {
               theme={theme}
               toggleTheme={toggleTheme}
               savedItemsCount={savedItems.size}
+              cartItemsCount={cartItems.size}
               allProducts={products}
               logoUrl={appContent.logoUrl}
             />

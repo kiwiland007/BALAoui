@@ -42,15 +42,18 @@ const AddItemPage: React.FC<AddItemPageProps> = ({ onAddItem, onCancel }) => {
       const validFiles: File[] = [];
 
       for (const file of files) {
-        if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-          alert(`Le type de fichier "${file.name}" n'est pas supporté. Types acceptés: JPG, PNG, GIF, WebP.`);
+        // FIX: Cast file to File to access its properties, resolving 'does not exist on type unknown' errors.
+        const fileAsFile = file as File;
+        if (!ALLOWED_IMAGE_TYPES.includes(fileAsFile.type)) {
+          alert(`Le type de fichier "${fileAsFile.name}" n'est pas supporté. Types acceptés: JPG, PNG, GIF, WebP.`);
           continue;
         }
-        if (file.size > MAX_IMAGE_SIZE) {
-          alert(`Le fichier "${file.name}" est trop volumineux (max 5MB).`);
+        if (fileAsFile.size > MAX_IMAGE_SIZE) {
+          alert(`Le fichier "${fileAsFile.name}" est trop volumineux (max 5MB).`);
           continue;
         }
-        validFiles.push(file);
+        // FIX: Push the correctly typed File object to the array.
+        validFiles.push(fileAsFile);
       }
       
       const newImageUrls = validFiles.map(file => URL.createObjectURL(file as Blob));

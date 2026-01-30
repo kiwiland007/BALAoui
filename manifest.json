@@ -1,0 +1,23 @@
+{
+  "short_name": "BALAoui",
+  "name": "BALAoui - Votre Marketplace Marocaine",
+  "description": "BALAoui est une marketplace C2C pour la mode de seconde main, conçue pour le marché marocain avec des fonctionnalités de confiance comme le paiement à la livraison et les rencontres locales pour faciliter les transactions.",
+  "icons": [
+    {
+      "src": "https://i.ibb.co/9vM9yBv/logo-no-background.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://i.ibb.co/9vM9yBv/logo-no-background.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#1A3A5A",
+  "background_color": "#f8fafc"
+}

@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import type { User, Product } from '../types';
+import type { User, Product, View } from '../types';
 import type { AppSettings } from '../App';
 import { mockReviews } from '../constants';
 import Rating from '../components/Rating';
@@ -26,9 +27,10 @@ interface ProfilePageProps {
   onReportProduct: (product: Product) => void;
   onOpenAddBalance: () => void;
   onOpenProModal: () => void;
+  onNavigate: (view: View) => void;
 }
 
-const ProfilePage: React.FC<ProfilePageProps> = ({ user, allProducts, onProductSelect, onBoostProduct, onDeleteProduct, onEditProduct, savedItems, onToggleSave, appSettings, currentUser, onReportProduct, onOpenAddBalance, onOpenProModal }) => {
+const ProfilePage: React.FC<ProfilePageProps> = ({ user, allProducts, onProductSelect, onBoostProduct, onDeleteProduct, onEditProduct, savedItems, onToggleSave, appSettings, currentUser, onReportProduct, onOpenAddBalance, onOpenProModal, onNavigate }) => {
   const [productToBoost, setProductToBoost] = useState<Product | null>(null);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
 
@@ -83,6 +85,11 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, allProducts, onProductS
                     <i className="fa-solid fa-user-plus mr-2 w-4 text-center"></i>Membre depuis {user.memberSince}
                 </p>
             </div>
+            {isOwnProfile && 
+                <Button onClick={() => onNavigate({name: 'orders'})} variant="outline" className="mt-4 h-9 px-4 text-xs">
+                    <i className="fa-solid fa-box-archive mr-2"></i>Mes Commandes
+                </Button>
+            }
           </div>
           {isOwnProfile && (
             <div className="text-center sm:text-right mt-4 sm:mt-0">

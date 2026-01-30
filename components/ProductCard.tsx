@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { Product, User } from '../types';
+import { ProductStatus } from '../types';
 import Button from './ui/Button';
 import Badge from './ui/Badge';
 import { Card, CardContent } from './ui/Card';
@@ -71,10 +72,17 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, showActions
   const discountPercentage = isDeal ? Math.round(((product.originalPrice! - product.price) / product.originalPrice!) * 100) : 0;
 
   const isOwner = currentUser?.id === product.seller.id;
+  const isSold = product.status === ProductStatus.Sold;
+
 
   return (
     <Card className="overflow-hidden group transition-all duration-300 hover:shadow-lg hover:border-primary flex flex-col">
       <div className="relative cursor-pointer" onClick={onClick}>
+        {isSold && (
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
+                <span className="text-white text-xl font-bold border-2 border-white px-4 py-2 -rotate-12">VENDU</span>
+            </div>
+        )}
         <img src={product.images[0]} alt={product.title} className="w-full h-72 object-cover" />
         
         <div className="absolute top-3 right-3 flex items-center space-x-2">
@@ -124,7 +132,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, showActions
           <p className="text-sm text-text-light dark:text-gray-400">{product.city}</p>
           {isCurrentlyBoosted && (
              <div className="mt-2">
-                <div className="inline-flex items-center space-x-1.5 text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-400 px-2 py-0.5 rounded-full">
+                <div className="inline-flex items-center space-x-1.5 text-xs font-bold text-white bg-gradient-to-r from-orange-400 to-amber-500 px-2.5 py-1 rounded-full shadow-md">
                     <i className="fa-solid fa-rocket"></i>
                     <span>Boosté</span>
                 </div>
@@ -144,11 +152,11 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, showActions
                     <i className="fa-solid fa-check-circle"></i>
                 </div>
             ) : (
-                <Button variant="ghost" className="w-full h-8 text-xs" onClick={handleBoostClick} title="Bump">
+                <Button variant="ghost" className="w-full h-8 text-xs" onClick={handleBoostClick} title="Bump" disabled={isSold}>
                     <i className="fa-solid fa-arrow-up"></i>
                 </Button>
             )}
-            <Button variant="ghost" className="w-full h-8 text-xs" onClick={handleEditClick} title="Modifier">
+            <Button variant="ghost" className="w-full h-8 text-xs" onClick={handleEditClick} title="Modifier" disabled={isSold}>
                 <i className="fa-solid fa-pencil"></i>
             </Button>
             <Button variant="ghost" className="w-full h-8 text-xs text-red-500 hover:bg-red-500/10 dark:hover:bg-red-500/20" onClick={handleDeleteClick} title="Supprimer">

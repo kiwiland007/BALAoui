@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import type { User, View, Product } from '../types';
 import type { Theme } from '../App';
@@ -11,6 +10,7 @@ interface HeaderProps {
   theme: Theme;
   toggleTheme: () => void;
   savedItemsCount: number;
+  cartItemsCount: number;
   allProducts: Product[];
   logoUrl?: string;
 }
@@ -28,7 +28,7 @@ const useDebounce = (value: string, delay: number) => {
     return debouncedValue;
 };
 
-const Header: React.FC<HeaderProps> = ({ onNavigate, user, onLogout, theme, toggleTheme, savedItemsCount, allProducts, logoUrl }) => {
+const Header: React.FC<HeaderProps> = ({ onNavigate, user, onLogout, theme, toggleTheme, savedItemsCount, cartItemsCount, allProducts, logoUrl }) => {
   const [isProfileMenuOpen, setProfileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Product[]>([]);
@@ -143,6 +143,18 @@ const Header: React.FC<HeaderProps> = ({ onNavigate, user, onLogout, theme, togg
                     <i className="fa-regular fa-comments text-xl"></i>
                 </button>
                 <button
+                    onClick={() => onNavigate({ name: 'cart' })}
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-text-light dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative"
+                    aria-label="Voir le panier"
+                >
+                    <i className="fa-solid fa-cart-shopping text-xl"></i>
+                    {cartItemsCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                        {cartItemsCount}
+                    </span>
+                    )}
+                </button>
+                <button
                     onClick={() => onNavigate({ name: 'saved' })}
                     className="w-10 h-10 rounded-full flex items-center justify-center text-text-light dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative"
                     aria-label="Voir les articles sauvegardés"
@@ -180,6 +192,7 @@ const Header: React.FC<HeaderProps> = ({ onNavigate, user, onLogout, theme, togg
                             <ul className="py-2">
                                 {user.isAdmin && <li onClick={() => { onNavigate({ name: 'admin' }); setProfileMenuOpen(false);}} className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-text-main dark:text-secondary flex items-center space-x-3"><i className="fa-solid fa-shield-halved w-4"></i><span>Admin</span></li>}
                                 <li onClick={() => { onNavigate({ name: 'profile', user }); setProfileMenuOpen(false);}} className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-text-main dark:text-secondary flex items-center space-x-3"><i className="fa-regular fa-user w-4"></i><span>Mon Profil</span></li>
+                                <li onClick={() => { onNavigate({ name: 'orders' }); setProfileMenuOpen(false);}} className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-text-main dark:text-secondary flex items-center space-x-3"><i className="fa-solid fa-box-archive w-4"></i><span>Mes Commandes</span></li>
                                 <li onClick={() => { onNavigate({ name: 'chat' }); setProfileMenuOpen(false);}} className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-text-main dark:text-secondary flex items-center space-x-3"><i className="fa-regular fa-comments w-4"></i><span>Mes Messages</span></li>
                                 <li onClick={() => { onNavigate({ name: 'saved' }); setProfileMenuOpen(false);}} className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-text-main dark:text-secondary flex items-center space-x-3"><i className="fa-regular fa-heart w-4"></i><span>Mes Favoris</span></li>
                             </ul>
