@@ -36,20 +36,41 @@ const mapProductToApp = (p: any): Product => ({
 });
 
 const api = {
+    // SETTINGS API
+    getSettings: async <T>(key: 'app_settings' | 'app_content'): Promise<T> => {
+        const { data, error } = await supabase
+            .from('site_settings')
+            .select('value')
+            .eq('key', key)
+            .single();
+        if (error) throw error;
+        return data.value;
+    },
+
+    updateSettings: async (key: 'app_settings' | 'app_content', value: any): Promise<void> => {
+        const { error } = await supabase
+            .from('site_settings')
+            .update({ value })
+            .eq('key', key);
+        if (error) throw error;
+    },
+
     // STORAGE API
-    uploadImage: async (file: File, userId: string): Promise<string> => {
+    uploadImage: async (file: File, folder: string = 'products'): Promise<string> => {
+        const { data: { session } } = await supabase.auth.getSession();
+        const userId = session?.user.id || 'anonymous';
         const fileExt = file.name.split('.').pop();
         const fileName = `${userId}/${Date.now()}.${fileExt}`;
         const filePath = `${fileName}`;
 
         const { error: uploadError } = await supabase.storage
-            .from('products')
+            .from(folder)
             .upload(filePath, file);
 
         if (uploadError) throw uploadError;
 
         const { data } = supabase.storage
-            .from('products')
+            .from(folder)
             .getPublicUrl(filePath);
 
         return data.publicUrl;
@@ -122,6 +143,35 @@ const api = {
         if (error) throw error;
     },
 
+    getUsers: async (): Promise<User[]> => {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('*');
+
+        if (error) throw error;
+        return (data || []).map(mapProfileToUser);
+    },
+
+    updateProfile: async (userId: string, updates: Partial<any>): Promise<User> => {
+        // Map camelCase to snake_case if necessary, profile fields are snake_case in DB
+        const dbUpdates: any = {};
+        if (updates.avatarUrl) dbUpdates.avatar_url = updates.avatarUrl;
+        if (updates.city) dbUpdates.city = updates.city;
+        if (updates.balance !== undefined) dbUpdates.balance = updates.balance;
+        if (updates.isPro !== undefined) dbUpdates.is_pro = updates.isPro;
+        if (updates.proSubscriptionExpires) dbUpdates.pro_subscription_expires = updates.proSubscriptionExpires;
+        if (updates.isAdmin !== undefined) dbUpdates.is_admin = updates.isAdmin;
+
+        const { data, error } = await supabase
+            .from('profiles')
+            .update(dbUpdates)
+            .eq('id', userId)
+            .select()
+            .single();
+        if (error) throw error;
+        return mapProfileToUser(data);
+    },
+
     // AUTH API
     getCurrentUser: async (): Promise<User | null> => {
         const { data: { session } } = await supabase.auth.getSession();
@@ -166,7 +216,7 @@ const api = {
         if (!authData.user) throw new Error("Erreur lors de la création du compte.");
 
         // Wait for profile trigger
-        await new Promise(r => setTimeout(r, 1000));
+        await new Promise(r => setTimeout(r, 2000));
 
         const { data: profile, error: profileError } = await supabase
             .from('profiles')
@@ -180,6 +230,98 @@ const api = {
 
     logout: async () => {
         await supabase.auth.signOut();
+    },
+
+    getOrders: async (): Promise<Order[]> => {
+        const { data, error } = await supabase
+            .from('orders')
+            .select('*, product:products(*), buyer:profiles!buyer_id(*), seller:profiles!seller_id(*)')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return (data || []).map(o => ({
+            id: o.id,
+            product: mapProductToApp(o.product),
+            buyer: mapProfileToUser(o.buyer),
+            seller: mapProfileToUser(o.seller),
+            status: o.status as OrderStatus,
+            totalAmount: Number(o.total_amount),
+            shippingFee: Number(o.shipping_fee),
+            buyerProtectionFee: Number(o.buyer_protection_fee),
+            createdAt: o.created_at,
+            updatedAt: o.updated_at
+        }));
+    },
+
+    createOrder: async (product: Product, buyer: User, buyerProtectionFee: number, shippingFee: number, totalAmount: number): Promise<Order> => {
+        const { data, error } = await supabase
+            .from('orders')
+            .insert({
+                product_id: product.id,
+                buyer_id: buyer.id,
+                seller_id: product.seller.id,
+                total_amount: totalAmount,
+                shipping_fee: shippingFee,
+                buyer_protection_fee: buyerProtectionFee,
+                status: OrderStatus.Paid
+            })
+            .select('*, product:products(*), buyer:profiles!buyer_id(*), seller:profiles!seller_id(*)')
+            .single();
+
+        if (error) throw error;
+
+        await supabase
+            .from('products')
+            .update({ status: ProductStatus.Sold })
+            .eq('id', product.id);
+
+        return {
+            id: data.id,
+            product: mapProductToApp(data.product),
+            buyer: mapProfileToUser(data.buyer),
+            seller: mapProfileToUser(data.seller),
+            status: data.status as OrderStatus,
+            totalAmount: Number(data.total_amount),
+            shippingFee: Number(data.shipping_fee),
+            buyerProtectionFee: Number(data.buyer_protection_fee),
+            createdAt: data.created_at,
+            updatedAt: data.updated_at
+        };
+    },
+
+    // Transaction History (Simulation/Read from Orders for now or separate table if needs complex accounting)
+    getTransactions: async (): Promise<Transaction[]> => {
+        const { data: orders, error } = await supabase
+            .from('orders')
+            .select('*, product:products!inner(*), buyer:profiles!buyer_id(*), seller:profiles!seller_id(*)')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        const txs: Transaction[] = [];
+        (orders || []).forEach(o => {
+            // Sale transaction for seller
+            txs.push({
+                id: `sale-${o.id}`,
+                date: o.created_at,
+                user: mapProfileToUser(o.seller),
+                type: TransactionType.Sale,
+                product: mapProductToApp(o.product),
+                amount: Number(o.product.price),
+                status: TransactionStatus.Completed
+            });
+            // Buyer Protection fee for buyer
+            txs.push({
+                id: `fee-${o.id}`,
+                date: o.created_at,
+                user: mapProfileToUser(o.buyer),
+                type: TransactionType.BuyerProtection,
+                product: mapProductToApp(o.product),
+                amount: Number(o.buyer_protection_fee) + Number(o.shipping_fee),
+                status: TransactionStatus.Completed
+            });
+        });
+        return txs;
     },
 
     // CHAT API

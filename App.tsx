@@ -56,6 +56,8 @@ const App: React.FC = () => {
   const [productToReport, setProductToReport] = useState<Product | null>(null);
   const [isAddingBalance, setIsAddingBalance] = useState(false);
   const [isProModalOpen, setIsProModalOpen] = useState(false);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+
   const [appSettings, setAppSettings] = useState<AppSettings>({
     commission: 5,
     bumpPrice: 10,
@@ -66,12 +68,14 @@ const App: React.FC = () => {
     buyerProtectionFeeFixed: 5,
     shippingFee: 35,
   });
-  const [appContent] = useState<AppContent>({
+
+  const [appContent, setAppContent] = useState<AppContent>({
     logoUrl: 'https://i.ibb.co/9vM9yBv/logo-no-background.png',
     heroImageUrl: 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?q=80&w=2070&auto=format&fit=crop',
     heroSlogan: 'BALAoui. Trouvez. Partagez.',
     heroSubSlogan: 'La marketplace C2C nouvelle génération au Maroc.',
   });
+
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window !== 'undefined') {
       if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -80,6 +84,29 @@ const App: React.FC = () => {
     }
     return 'light';
   });
+
+  const fetchData = useCallback(async () => {
+    try {
+      const [p, u, o, tx, s, c] = await Promise.all([
+        api.getProducts(),
+        api.getUsers(),
+        api.getOrders(),
+        api.getTransactions(),
+        api.getSettings<AppSettings>('app_settings'),
+        api.getSettings<AppContent>('app_content'),
+      ]);
+      setProducts(p);
+      setUsers(u);
+      setOrders(o);
+      setTransactions(tx);
+      if (s) setAppSettings(s);
+      if (c) setAppContent(c);
+    } catch (err) {
+      console.error("Data fetch error:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   // Sync with Supabase Auth
   useEffect(() => {
@@ -99,26 +126,6 @@ const App: React.FC = () => {
       return () => subscription.unsubscribe();
     };
     initAuth();
-  }, []);
-
-  const fetchData = useCallback(async () => {
-    try {
-      const [p, u, o] = await Promise.all([
-        api.getProducts(),
-        api.getUsers(),
-        api.getOrders(),
-      ]);
-      setProducts(p);
-      setUsers(u);
-      setOrders(o);
-    } catch (err) {
-      console.error("Data fetch error:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
     fetchData();
   }, [fetchData]);
 
@@ -132,7 +139,6 @@ const App: React.FC = () => {
         const newMessage = payload.new;
         setConversations(prev => prev.map(c => {
           if (c.id === newMessage.conversation_id) {
-            // Only add if not already there (prevents double messages)
             if (!c.messages.some(m => m.id === newMessage.id)) {
               return {
                 ...c,
@@ -174,7 +180,6 @@ const App: React.FC = () => {
       const newSet = new Set(prev);
       if (newSet.has(productId)) {
         newSet.delete(productId);
-        showToast("Retiré des favoris", "fa-solid fa-heart-crack");
       } else {
         newSet.add(productId);
         showToast("Ajouté aux favoris!", "fa-solid fa-heart");
@@ -189,15 +194,11 @@ const App: React.FC = () => {
       return;
     }
     const product = products.find(p => p.id === productId);
-    if (!product || product.status === ProductStatus.Sold || product.seller.id === currentUser.id) {
-      showToast("Action impossible.", "fa-solid fa-warning");
-      return;
-    }
+    if (!product || product.status === ProductStatus.Sold || product.seller.id === currentUser.id) return;
+
     setCartItems(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(productId)) {
-        showToast("Déjà au panier.", "fa-solid fa-info-circle");
-      } else {
+      if (!newSet.has(productId)) {
         newSet.add(productId);
         showToast("Ajouté au panier!", "fa-solid fa-cart-plus");
       }
@@ -215,26 +216,16 @@ const App: React.FC = () => {
 
   const handleAddItem = useCallback(async (newProductData: Omit<Product, 'id' | 'seller' | 'status'>, files: File[]) => {
     if (!currentUser) return;
-
     try {
-      // 1. Upload images
       const imageUrls = await Promise.all(
-        files.map(file => api.uploadImage(file, currentUser.id))
+        files.map(file => api.uploadImage(file, 'products'))
       );
-
-      // 2. Create product
-      const finalProductData = {
-        ...newProductData,
-        images: imageUrls
-      };
-
+      const finalProductData = { ...newProductData, images: imageUrls };
       const newProduct = await api.addProduct(finalProductData, currentUser.id);
-
       setProducts(prev => [newProduct, ...prev]);
       showToast("Article publié !", "fa-solid fa-check-circle");
       handleNavigate({ name: 'profile', user: currentUser });
     } catch (err) {
-      console.error(err);
       showToast("Erreur lors de l'ajout.", "fa-solid fa-exclamation-circle");
     }
   }, [currentUser, handleNavigate]);
@@ -255,17 +246,17 @@ const App: React.FC = () => {
       handleNavigate({ name: 'auth' });
       return;
     }
-
     try {
       const newOrder = await api.createOrder(product, currentUser, buyerProtectionFee, shippingFee, totalAmount);
       setOrders(prev => [newOrder, ...prev]);
       setProducts(prev => prev.map(p => p.id === product.id ? { ...p, status: ProductStatus.Sold } : p));
       showToast(`Commande passée !`, "fa-solid fa-check-circle");
       handleNavigate({ name: 'orders' });
+      fetchData();
     } catch (err) {
       showToast("Erreur lors du paiement.", "fa-solid fa-warning");
     }
-  }, [currentUser, handleNavigate]);
+  }, [currentUser, handleNavigate, fetchData]);
 
   const handleAddBalance = useCallback(async (amount: number) => {
     if (!currentUser) return;
@@ -282,7 +273,6 @@ const App: React.FC = () => {
   const handleBoostProduct = useCallback(async (productId: string, option: 'bump' | 'feature', paymentMethod: 'card' | 'balance') => {
     if (!currentUser) return;
     const cost = option === 'bump' ? appSettings.bumpPrice : appSettings.featurePrice;
-
     try {
       if (paymentMethod === 'balance') {
         if (currentUser.balance < cost) {
@@ -290,19 +280,20 @@ const App: React.FC = () => {
           return;
         }
         await api.updateProfile(currentUser.id, { balance: currentUser.balance - cost });
-        const updatedUser = await api.getCurrentUser();
-        setCurrentUser(updatedUser);
       }
-
       const boostedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-      // Update product locally and remotely
-      setProducts(prev => prev.map(p => p.id === productId ? { ...p, boostedUntil, isFeatured: option === 'feature' } : p));
-
+      const product = products.find(p => p.id === productId);
+      if (product) {
+        const updated = await api.updateProduct({ ...product, boostedUntil, isFeatured: option === 'feature' });
+        setProducts(prev => prev.map(p => p.id === productId ? updated : p));
+      }
       showToast(`Boost activé !`, 'fa-solid fa-rocket');
+      const finalUser = await api.getCurrentUser();
+      setCurrentUser(finalUser);
     } catch (err) {
       showToast("Erreur lors du boost.", "fa-solid fa-warning");
     }
-  }, [currentUser, appSettings]);
+  }, [currentUser, appSettings, products]);
 
   const handleDeleteProduct = useCallback(async (productId: string) => {
     try {
@@ -367,6 +358,48 @@ const App: React.FC = () => {
       showToast("Message non envoyé.", "fa-solid fa-warning");
     }
   }, [currentUser]);
+
+  const handleUpdateSettings = useCallback(async (newSettings: AppSettings) => {
+    try {
+      await api.updateSettings('app_settings', newSettings);
+      setAppSettings(newSettings);
+      showToast('Paramètres sauvegardés !', 'fa-solid fa-save');
+    } catch (err) {
+      showToast('Erreur lors de la sauvegarde.', 'fa-solid fa-warning');
+    }
+  }, []);
+
+  const handleContentUpdate = useCallback(async (newContent: AppContent) => {
+    setAppContent(newContent);
+  }, []);
+
+  const handleProductStatusChange = useCallback(async (productId: string, status: ProductStatus) => {
+    try {
+      const product = products.find(p => p.id === productId);
+      if (product) {
+        const updated = await api.updateProduct({ ...product, status });
+        setProducts(prev => prev.map(p => p.id === productId ? updated : p));
+        showToast(`Statut mis à jour : ${status}`, 'fa-solid fa-check-circle');
+      }
+    } catch (err) {
+      showToast('Erreur statut.', 'fa-solid fa-warning');
+    }
+  }, [products]);
+
+  const handleToggleUserProStatus = useCallback(async (userId: string) => {
+    try {
+      const user = users.find(u => u.id === userId);
+      if (user) {
+        const isNowPro = !user.isPro;
+        const updated = await api.updateProfile(userId, { isPro: isNowPro });
+        setUsers(prev => prev.map(u => u.id === userId ? updated : u));
+        showToast(`${user.name} est ${isNowPro ? 'maintenant PRO' : 'un utilisateur standard'}`, 'fa-solid fa-user-check');
+      }
+    } catch (err) {
+      showToast('Erreur pro status.', 'fa-solid fa-warning');
+    }
+  }, [users]);
+
 
   const toggleTheme = () => {
     setTheme(prev => {
@@ -475,14 +508,14 @@ const App: React.FC = () => {
             onNavigate={handleNavigate}
             appSettings={appSettings}
             appContent={{ ...appContent }}
-            onUpdateSettings={() => { }}
+            onUpdateSettings={handleUpdateSettings}
             products={products}
             users={users}
-            transactions={[]}
-            onProductStatusChange={() => { }}
+            transactions={transactions}
+            onProductStatusChange={handleProductStatusChange}
             showToast={showToast}
-            onContentUpdate={() => { }}
-            onToggleUserProStatus={() => { }}
+            onContentUpdate={handleContentUpdate}
+            onToggleUserProStatus={handleToggleUserProStatus}
           />
         case 'chat':
           return <ChatPage
