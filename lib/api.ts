@@ -1,7 +1,7 @@
 
 import { supabase } from './supabase';
-import type { Product, User, Review, Transaction, Conversation, Message, Order } from '../types';
-import { ProductStatus, OrderStatus, TransactionType, TransactionStatus } from '../types';
+import type { Product, User, Review, Transaction, Conversation, Message, Order, Report } from '../types';
+import { ProductStatus, OrderStatus, TransactionType, TransactionStatus, ReportStatus } from '../types';
 
 // Utility to convert Supabase row to our app types
 const mapProfileToUser = (profile: any): User => ({
@@ -33,6 +33,16 @@ const mapProductToApp = (p: any): Product => ({
     status: p.status as ProductStatus,
     isFeatured: p.is_featured,
     boostedUntil: p.boosted_until
+});
+
+const mapReportToApp = (r: any): Report => ({
+    id: r.id,
+    product: mapProductToApp(r.product),
+    reporter: mapProfileToUser(r.reporter),
+    reason: r.reason,
+    details: r.details,
+    status: r.status as ReportStatus,
+    createdAt: r.created_at
 });
 
 const api = {
@@ -437,6 +447,52 @@ const api = {
 
         const convs = await api.getConversationsForUser(currentUser.id);
         return convs.find(c => c.id === newConv.id)!;
+    },
+
+    // REPORTS API
+    getReports: async (): Promise<Report[]> => {
+        const { data, error } = await supabase
+            .from('reports')
+            .select(`
+                *,
+                product:products(*, profiles(*)),
+                reporter:profiles!reporter_id(*)
+            `)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return (data || []).map(mapReportToApp);
+    },
+
+    addReport: async (productId: string, reporterId: string, reason: string, details?: string): Promise<Report> => {
+        const { data, error } = await supabase
+            .from('reports')
+            .insert({ product_id: productId, reporter_id: reporterId, reason, details })
+            .select(`
+                *,
+                product:products(*, profiles(*)),
+                reporter:profiles!reporter_id(*)
+            `)
+            .single();
+
+        if (error) throw error;
+        return mapReportToApp(data);
+    },
+
+    updateReportStatus: async (reportId: string, status: ReportStatus): Promise<Report> => {
+        const { data, error } = await supabase
+            .from('reports')
+            .update({ status, updated_at: new Date().toISOString() })
+            .eq('id', reportId)
+            .select(`
+                *,
+                product:products(*, profiles(*)),
+                reporter:profiles!reporter_id(*)
+            `)
+            .single();
+
+        if (error) throw error;
+        return mapReportToApp(data);
     }
 };
 

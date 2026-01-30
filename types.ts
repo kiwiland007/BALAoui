@@ -62,34 +62,34 @@ export enum ProductCondition {
 }
 
 export enum ProductStatus {
-    Pending = "En attente",
-    Approved = "Approuvé",
-    Rejected = "Rejeté",
-    Sold = "Vendu",
+  Pending = "En attente",
+  Approved = "Approuvé",
+  Rejected = "Rejeté",
+  Sold = "Vendu",
 }
 
 export enum TransactionType {
-    Bump = "Bump d'article",
-    Feature = "Mise à la une",
-    Sale = "Vente finalisée",
-    Deposit = "Dépôt de solde",
-    Subscription = "Abonnement Pro",
-    BuyerProtection = "Protection Acheteurs",
+  Bump = "Bump d'article",
+  Feature = "Mise à la une",
+  Sale = "Vente finalisée",
+  Deposit = "Dépôt de solde",
+  Subscription = "Abonnement Pro",
+  BuyerProtection = "Protection Acheteurs",
 }
 
 export enum TransactionStatus {
-    Completed = "Terminée",
-    Pending = "En attente",
+  Completed = "Terminée",
+  Pending = "En attente",
 }
 
 export enum OrderStatus {
-    PendingPayment = "Paiement en attente",
-    Paid = "Payée",
-    Shipped = "Expédiée",
-    Delivered = "Livrée",
-    Completed = "Terminée",
-    Cancelled = "Annulée",
-    Disputed = "En litige",
+  PendingPayment = "Paiement en attente",
+  Paid = "Payée",
+  Shipped = "Expédiée",
+  Delivered = "Livrée",
+  Completed = "Terminée",
+  Cancelled = "Annulée",
+  Disputed = "En litige",
 }
 
 export interface User {
@@ -124,54 +124,70 @@ export interface Product {
 }
 
 export interface Review {
-    id: string;
-    author: User;
-    rating: number;
-    comment: string;
-    date: string;
+  id: string;
+  author: User;
+  rating: number;
+  comment: string;
+  date: string;
 }
 
 export interface Transaction {
-    id: string;
-    date: string;
-    user: User;
-    type: TransactionType;
-    product?: Product;
-    amount: number;
-    status: TransactionStatus;
+  id: string;
+  date: string;
+  user: User;
+  type: TransactionType;
+  product?: Product;
+  amount: number;
+  status: TransactionStatus;
 }
 
 export interface Order {
-    id: string;
-    product: Product;
-    buyer: User;
-    seller: User;
-    status: OrderStatus;
-    totalAmount: number;
-    shippingFee: number;
-    buyerProtectionFee: number;
-    trackingNumber?: string;
-    createdAt: string;
-    updatedAt: string;
+  id: string;
+  product: Product;
+  buyer: User;
+  seller: User;
+  status: OrderStatus;
+  totalAmount: number;
+  shippingFee: number;
+  buyerProtectionFee: number;
+  trackingNumber?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Message {
-    id: string;
-    senderId: string;
-    text: string;
-    timestamp: string;
+  id: string;
+  senderId: string;
+  text: string;
+  timestamp: string;
 }
 
 export interface Conversation {
-    id: string;
-    participants: User[];
-    product: Product;
-    messages: Message[];
-    lastMessageTimestamp: string;
+  id: string;
+  participants: User[];
+  product: Product;
+  messages: Message[];
+  lastMessageTimestamp: string;
 }
 
 
-export type View = 
+export enum ReportStatus {
+  Pending = "En attente",
+  Resolved = "Résolu",
+  Dismissed = "Rejeté",
+}
+
+export interface Report {
+  id: string;
+  product: Product;
+  reporter: User;
+  reason: string;
+  details?: string;
+  status: ReportStatus;
+  createdAt: string;
+}
+
+export type View =
   | { name: 'home' }
   | { name: 'productDetail', product: Product }
   | { name: 'addItem' }
@@ -180,6 +196,7 @@ export type View =
   | { name: 'saved' }
   | { name: 'search', query: string }
   | { name: 'admin' }
+  | { name: 'reports' }
   | { name: 'auth' }
   | { name: 'orders' }
   | { name: 'cart' }

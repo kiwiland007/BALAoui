@@ -12,25 +12,30 @@ import AdminSettings from '../components/admin/AdminSettings';
 import TransactionsTable from '../components/admin/TransactionsTable';
 import AdminPayments from '../components/admin/AdminPayments';
 import AdminContent from '../components/admin/AdminContent';
+import ReportTable from '../components/admin/ReportTable';
 import ConfirmationModal from '../components/ConfirmationModal';
+import { ReportStatus } from '../types';
+import type { Report } from '../types';
 
 interface AdminPageProps {
-  onNavigate: (view: View) => void;
-  appSettings: AppSettings;
-  appContent: AppContent;
-  onUpdateSettings: (newSettings: AppSettings) => void;
-  products: Product[];
-  users: User[];
-  transactions: Transaction[];
-  onProductStatusChange: (productId: string, status: ProductStatus) => void;
-  showToast: (message: string, icon: string) => void;
-  onContentUpdate: (newContent: AppContent) => void;
-  onToggleUserProStatus: (userId: string) => void;
+    onNavigate: (view: View) => void;
+    appSettings: AppSettings;
+    appContent: AppContent;
+    onUpdateSettings: (newSettings: AppSettings) => void;
+    products: Product[];
+    users: User[];
+    transactions: Transaction[];
+    onProductStatusChange: (productId: string, status: ProductStatus) => void;
+    showToast: (message: string, icon: string) => void;
+    onContentUpdate: (newContent: AppContent) => void;
+    onToggleUserProStatus: (userId: string) => void;
+    reports: Report[];
+    onReportStatusChange: (reportId: string, status: ReportStatus) => void;
 }
 
-const AdminPage: React.FC<AdminPageProps> = ({ 
-    onNavigate, 
-    appSettings, 
+const AdminPage: React.FC<AdminPageProps> = ({
+    onNavigate,
+    appSettings,
     appContent,
     onUpdateSettings,
     products,
@@ -40,6 +45,8 @@ const AdminPage: React.FC<AdminPageProps> = ({
     showToast,
     onContentUpdate,
     onToggleUserProStatus,
+    reports,
+    onReportStatusChange,
 }) => {
     const [userSearch, setUserSearch] = useState('');
     const [productSearch, setProductSearch] = useState('');
@@ -56,7 +63,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
     const boostRevenue = transactions
         .filter(t => t.type === TransactionType.Bump || t.type === TransactionType.Feature)
         .reduce((acc, t) => acc + t.amount, 0);
-    
+
     const pendingProducts = products.filter(p => p.status === ProductStatus.Pending).length;
 
     const categoryData = useMemo(() => {
@@ -81,7 +88,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
     }, [products, productSearch]);
 
     const filteredTransactions = useMemo(() => {
-        return transactions.filter(t => 
+        return transactions.filter(t =>
             t.user.name.toLowerCase().includes(transactionSearch.toLowerCase()) ||
             (t.product && t.product.title.toLowerCase().includes(transactionSearch.toLowerCase())) ||
             t.type.toLowerCase().includes(transactionSearch.toLowerCase())
@@ -93,26 +100,27 @@ const AdminPage: React.FC<AdminPageProps> = ({
         <div className="container mx-auto px-4 py-8">
             {userToConfirmToggle && (
                 <ConfirmationModal
-                  title={`Confirmer le changement de statut`}
-                  onClose={() => setUserToConfirmToggle(null)}
-                  onConfirm={() => {
-                      onToggleUserProStatus(userToConfirmToggle.id);
-                      setUserToConfirmToggle(null);
-                  }}
-                  confirmText="Confirmer"
+                    title={`Confirmer le changement de statut`}
+                    onClose={() => setUserToConfirmToggle(null)}
+                    onConfirm={() => {
+                        onToggleUserProStatus(userToConfirmToggle.id);
+                        setUserToConfirmToggle(null);
+                    }}
+                    confirmText="Confirmer"
                 >
-                  Êtes-vous sûr de vouloir {userToConfirmToggle.isPro ? 'révoquer le statut Pro de' : 'promouvoir'} {userToConfirmToggle.name} ?
+                    Êtes-vous sûr de vouloir {userToConfirmToggle.isPro ? 'révoquer le statut Pro de' : 'promouvoir'} {userToConfirmToggle.name} ?
                 </ConfirmationModal>
             )}
 
             <h1 className="text-3xl font-bold text-text-main dark:text-secondary mb-8">Tableau de Bord Administrateur</h1>
-            
+
             <Tabs defaultValue="dashboard">
                 <TabsList className="mb-8 flex flex-wrap h-auto">
                     <TabsTrigger value="dashboard"><i className="fa-solid fa-chart-pie mr-2"></i>Tableau de bord</TabsTrigger>
                     <TabsTrigger value="users"><i className="fa-solid fa-users mr-2"></i>Utilisateurs</TabsTrigger>
                     <TabsTrigger value="products"><i className="fa-solid fa-box mr-2"></i>Articles</TabsTrigger>
                     <TabsTrigger value="transactions"><i className="fa-solid fa-receipt mr-2"></i>Transactions</TabsTrigger>
+                    <TabsTrigger value="reports"><i className="fa-solid fa-flag mr-2"></i>Signalements</TabsTrigger>
                     <TabsTrigger value="settings"><i className="fa-solid fa-cogs mr-2"></i>Paramètres</TabsTrigger>
                     <TabsTrigger value="payments"><i className="fa-solid fa-credit-card mr-2"></i>Paiements</TabsTrigger>
                     <TabsTrigger value="content"><i className="fa-solid fa-file-lines mr-2"></i>Contenu</TabsTrigger>
@@ -132,18 +140,18 @@ const AdminPage: React.FC<AdminPageProps> = ({
 
                 <TabsContent value="users">
                     <Card>
-                        <UserTable 
-                            users={filteredUsers} 
-                            onSearchChange={setUserSearch} 
+                        <UserTable
+                            users={filteredUsers}
+                            onSearchChange={setUserSearch}
                             onShowToggleProConfirm={setUserToConfirmToggle}
                         />
                     </Card>
                 </TabsContent>
-                
+
                 <TabsContent value="products">
-                     <Card>
-                        <ProductTable 
-                            products={filteredProducts} 
+                    <Card>
+                        <ProductTable
+                            products={filteredProducts}
                             onProductSelect={(product) => onNavigate({ name: 'productDetail', product })}
                             onStatusChange={onProductStatusChange}
                             onSearchChange={setProductSearch}
@@ -153,10 +161,20 @@ const AdminPage: React.FC<AdminPageProps> = ({
 
                 <TabsContent value="transactions">
                     <Card>
-                        <TransactionsTable 
+                        <TransactionsTable
                             transactions={filteredTransactions}
                             onSearchChange={setTransactionSearch}
-                         />
+                        />
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="reports">
+                    <Card>
+                        <ReportTable
+                            reports={reports}
+                            onStatusChange={onReportStatusChange}
+                            onViewProduct={(id) => onNavigate({ name: 'productDetail', product: products.find(p => p.id === id)! })}
+                        />
                     </Card>
                 </TabsContent>
 

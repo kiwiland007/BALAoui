@@ -1,7 +1,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
-import type { Product, User, View, Transaction, Conversation, Message, Order } from './types';
-import { ProductStatus, TransactionType, TransactionStatus } from './types';
+import type { Product, User, View, Transaction, Conversation, Message, Order, Report } from './types';
+import { ProductStatus, TransactionType, TransactionStatus, ReportStatus } from './types';
 import api from './lib/api';
 import { supabase } from './lib/supabase';
 import Header from './components/Header';
@@ -57,6 +57,7 @@ const App: React.FC = () => {
   const [isAddingBalance, setIsAddingBalance] = useState(false);
   const [isProModalOpen, setIsProModalOpen] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [reports, setReports] = useState<Report[]>([]);
 
   const [appSettings, setAppSettings] = useState<AppSettings>({
     commission: 5,
@@ -87,13 +88,14 @@ const App: React.FC = () => {
 
   const fetchData = useCallback(async () => {
     try {
-      const [p, u, o, tx, s, c] = await Promise.all([
+      const [p, u, o, tx, s, c, r] = await Promise.all([
         api.getProducts(),
         api.getUsers(),
         api.getOrders(),
         api.getTransactions(),
         api.getSettings<AppSettings>('app_settings'),
         api.getSettings<AppContent>('app_content'),
+        api.getReports(),
       ]);
       setProducts(p);
       setUsers(u);
@@ -101,6 +103,7 @@ const App: React.FC = () => {
       setTransactions(tx);
       if (s) setAppSettings(s);
       if (c) setAppContent(c);
+      setReports(r);
     } catch (err) {
       console.error("Data fetch error:", err);
     } finally {
@@ -400,6 +403,27 @@ const App: React.FC = () => {
     }
   }, [users]);
 
+  const handleReportProduct = useCallback(async (productId: string, reason: string, details?: string) => {
+    if (!currentUser) return;
+    try {
+      await api.addReport(productId, currentUser.id, reason, details);
+      showToast("Signalement envoyé.", "fa-solid fa-flag");
+      setProductToReport(null);
+    } catch (err) {
+      showToast("Erreur lors du signalement.", "fa-solid fa-warning");
+    }
+  }, [currentUser]);
+
+  const handleReportStatusChange = useCallback(async (reportId: string, status: ReportStatus) => {
+    try {
+      const updated = await api.updateReportStatus(reportId, status);
+      setReports(prev => prev.map(r => r.id === reportId ? updated : r));
+      showToast(`Signalement mis à jour : ${status}`, 'fa-solid fa-check-circle');
+    } catch (err) {
+      showToast('Erreur mise à jour signalement.', 'fa-solid fa-warning');
+    }
+  }, []);
+
 
   const toggleTheme = () => {
     setTheme(prev => {
@@ -512,7 +536,9 @@ const App: React.FC = () => {
             products={products}
             users={users}
             transactions={transactions}
+            reports={reports}
             onProductStatusChange={handleProductStatusChange}
+            onReportStatusChange={handleReportStatusChange}
             showToast={showToast}
             onContentUpdate={handleContentUpdate}
             onToggleUserProStatus={handleToggleUserProStatus}
@@ -565,7 +591,7 @@ const App: React.FC = () => {
           {mainContent}
         </main>
         {toast && <Toast key={toast.id} message={toast.message} icon={toast.icon} />}
-        {productToReport && <ReportModal product={productToReport} onClose={() => setProductToReport(null)} onSubmit={() => { }} />}
+        {productToReport && <ReportModal product={productToReport} onClose={() => setProductToReport(null)} onSubmit={handleReportProduct} />}
         {isAddingBalance && currentUser && <AddBalanceModal onClose={() => setIsAddingBalance(false)} onAddBalance={handleAddBalance} />}
         {isProModalOpen && currentUser && <ProModal onClose={() => setIsProModalOpen(false)} onSubscribe={() => { }} settings={appSettings} currentUser={currentUser} />}
       </div>
