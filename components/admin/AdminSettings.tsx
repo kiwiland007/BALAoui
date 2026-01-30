@@ -149,6 +149,16 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ settings, onSave }) => {
                             <input type="range" min="0" max="15" step="0.5" name="buyerProtectionFeePercent" value={currentSettings.buyerProtectionFeePercent} onChange={handleChange} className={sliderClasses} />
                         </div>
                     </div>
+                    <div>
+                        <label htmlFor="buyerProtectionFeeFixed" className="flex items-center space-x-2 text-sm font-medium text-text-main dark:text-secondary">
+                            <i className="fa-solid fa-plus w-4 text-center text-text-light"></i>
+                            <span>Protection Acheteurs Fixe (MAD)</span>
+                        </label>
+                        <div className="flex items-center space-x-4 mt-1">
+                            <input type="number" id="buyerProtectionFeeFixed" name="buyerProtectionFeeFixed" value={currentSettings.buyerProtectionFeeFixed} onChange={handleChange} className={inputClasses} step="1" min="0" max="50" />
+                            <input type="range" min="0" max="50" step="1" name="buyerProtectionFeeFixed" value={currentSettings.buyerProtectionFeeFixed} onChange={handleChange} className={sliderClasses} />
+                        </div>
+                    </div>
                 </CardContent>
             </Card>
 

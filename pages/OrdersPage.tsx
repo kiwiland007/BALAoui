@@ -11,9 +11,16 @@ interface OrdersPageProps {
     orders: Order[];
     showToast: (message: string, icon: string) => void;
     onNavigate: (view: View) => void;
+    onUpdateStatus: (orderId: string, status: OrderStatus) => void;
 }
 
-const OrderCard: React.FC<{ order: Order, type: 'purchase' | 'sale', onNavigate: (view: View) => void, showToast: (message: string, icon: string) => void }> = ({ order, type, onNavigate, showToast }) => {
+const OrderCard: React.FC<{
+    order: Order,
+    type: 'purchase' | 'sale',
+    onNavigate: (view: View) => void,
+    showToast: (message: string, icon: string) => void,
+    onUpdateStatus: (orderId: string, status: OrderStatus) => void
+}> = ({ order, type, onNavigate, showToast, onUpdateStatus }) => {
     const otherParty = type === 'purchase' ? order.seller : order.buyer;
 
     const getStatusInfo = (status: OrderStatus) => {
@@ -33,8 +40,7 @@ const OrderCard: React.FC<{ order: Order, type: 'purchase' | 'sale', onNavigate:
     }
 
     const handleConfirmReception = () => {
-        showToast("Réception confirmée, merci !", "fa-solid fa-handshake");
-        // In a real app, this would update the order status to Completed
+        onUpdateStatus(order.id, OrderStatus.Delivered);
     }
 
     return (
@@ -91,7 +97,7 @@ const OrderCard: React.FC<{ order: Order, type: 'purchase' | 'sale', onNavigate:
     );
 }
 
-const OrdersPage: React.FC<OrdersPageProps> = ({ currentUser, orders, showToast, onNavigate }) => {
+const OrdersPage: React.FC<OrdersPageProps> = ({ currentUser, orders, showToast, onNavigate, onUpdateStatus }) => {
     const purchases = orders.filter(o => o.buyer.id === currentUser.id);
     const sales = orders.filter(o => o.seller.id === currentUser.id);
 
@@ -108,7 +114,7 @@ const OrdersPage: React.FC<OrdersPageProps> = ({ currentUser, orders, showToast,
                 <TabsContent value="purchases" className="mt-8">
                     {purchases.length > 0 ? (
                         <div className="space-y-4">
-                            {purchases.map(order => <OrderCard key={order.id} order={order} type="purchase" onNavigate={onNavigate} showToast={showToast} />)}
+                            {purchases.map(order => <OrderCard key={order.id} order={order} type="purchase" onNavigate={onNavigate} showToast={showToast} onUpdateStatus={onUpdateStatus} />)}
                         </div>
                     ) : (
                         <Card className="text-center py-20 px-6">
@@ -127,7 +133,7 @@ const OrdersPage: React.FC<OrdersPageProps> = ({ currentUser, orders, showToast,
                 <TabsContent value="sales" className="mt-8">
                     {sales.length > 0 ? (
                         <div className="space-y-4">
-                            {sales.map(order => <OrderCard key={order.id} order={order} type="sale" onNavigate={onNavigate} showToast={showToast} />)}
+                            {sales.map(order => <OrderCard key={order.id} order={order} type="sale" onNavigate={onNavigate} showToast={showToast} onUpdateStatus={onUpdateStatus} />)}
                         </div>
                     ) : (
                         <Card className="text-center py-20 px-6">

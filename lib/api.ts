@@ -64,9 +64,9 @@ const api = {
             .from('site_settings')
             .select('value')
             .eq('key', key)
-            .single();
+            .maybeSingle();
         if (error) throw error;
-        return data.value;
+        return data?.value || null;
     },
 
     updateSettings: async (key: 'app_settings' | 'app_content', value: any): Promise<void> => {
@@ -353,6 +353,36 @@ const api = {
                 shipped_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
             })
+            .eq('id', orderId)
+            .select('*, product:products(*), buyer:profiles!buyer_id(*), seller:profiles!seller_id(*)')
+            .single();
+
+        if (error) throw error;
+        return {
+            id: data.id,
+            product: mapProductToApp(data.product),
+            buyer: mapProfileToUser(data.buyer),
+            seller: mapProfileToUser(data.seller),
+            status: data.status as OrderStatus,
+            totalAmount: Number(data.total_amount),
+            shippingFee: Number(data.shipping_fee),
+            buyerProtectionFee: Number(data.buyer_protection_fee),
+            trackingNumber: data.tracking_number,
+            shippingProvider: data.shipping_provider,
+            shippedAt: data.shipped_at,
+            deliveredAt: data.delivered_at,
+            createdAt: data.created_at,
+            updatedAt: data.updated_at
+        };
+    },
+
+    updateOrderStatus: async (orderId: string, status: OrderStatus): Promise<Order> => {
+        const updateData: any = { status, updated_at: new Date().toISOString() };
+        if (status === OrderStatus.Delivered) updateData.delivered_at = new Date().toISOString();
+
+        const { data, error } = await supabase
+            .from('orders')
+            .update(updateData)
             .eq('id', orderId)
             .select('*, product:products(*), buyer:profiles!buyer_id(*), seller:profiles!seller_id(*)')
             .single();

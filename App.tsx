@@ -521,6 +521,31 @@ const App: React.FC = () => {
     }
   }, [currentUser, fetchConversations]);
 
+  const handleUpdateOrderStatus = useCallback(async (orderId: string, status: OrderStatus) => {
+    try {
+      const updated = await api.updateOrderStatus(orderId, status);
+      setOrders(prev => prev.map(o => o.id === orderId ? updated : o));
+      showToast(`Commande mise à jour: ${status}`, 'fa-solid fa-check-circle');
+
+      if (currentUser) {
+        const recipient = currentUser.id === updated.buyer.id ? updated.seller : updated.buyer;
+        const conv = await api.findOrCreateConversation(currentUser, recipient, updated.product);
+        let msg = '';
+        if (status === OrderStatus.Delivered) {
+          msg = `✅ Colis reçu ! L'acheteur a confirmé la réception de "${updated.product.title}".`;
+        } else if (status === OrderStatus.Completed) {
+          msg = `🎉 Transaction terminée pour "${updated.product.title}". Les fonds ont été débloqués.`;
+        }
+        if (msg) {
+          await api.sendMessage(conv.id, `[NOTIFICATION SYSTÈME] ${msg}`, currentUser.id);
+        }
+        fetchConversations();
+      }
+    } catch (err) {
+      showToast('Erreur mise à jour commande.', 'fa-solid fa-warning');
+    }
+  }, [currentUser, fetchConversations]);
+
   const toggleTheme = () => {
     setTheme(prev => {
       const next = prev === 'light' ? 'dark' : 'light';
@@ -654,6 +679,7 @@ const App: React.FC = () => {
           orders={orders}
           showToast={showToast}
           onNavigate={handleNavigate}
+          onUpdateStatus={handleUpdateOrderStatus}
         />;
       case 'cart':
         return <CartPage
