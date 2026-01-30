@@ -379,15 +379,29 @@ const App: React.FC = () => {
   const handleProductStatusChange = useCallback(async (productId: string, status: ProductStatus) => {
     try {
       const product = products.find(p => p.id === productId);
-      if (product) {
+      if (product && currentUser) {
         const updated = await api.updateProduct({ ...product, status });
         setProducts(prev => prev.map(p => p.id === productId ? updated : p));
         showToast(`Statut mis à jour : ${status}`, 'fa-solid fa-check-circle');
+
+        // Automated Notification Message
+        let notificationMsg = '';
+        if (status === ProductStatus.Approved) {
+          notificationMsg = `Félicitations ! Votre article "${product.title}" a été approuvé et est maintenant visible sur la plateforme.`;
+        } else if (status === ProductStatus.Rejected) {
+          notificationMsg = `Désolé, votre article "${product.title}" a été refusé car il ne respecte pas nos conditions générales de vente. Veuillez le modifier et le soumettre à nouveau.`;
+        }
+
+        if (notificationMsg && product.seller.id !== currentUser.id) {
+          const conv = await api.findOrCreateConversation(currentUser, product.seller, product);
+          await api.sendMessage(conv.id, `[NOTIFICATION SYSTÈME] ${notificationMsg}`, currentUser.id);
+          fetchConversations();
+        }
       }
     } catch (err) {
       showToast('Erreur statut.', 'fa-solid fa-warning');
     }
-  }, [products]);
+  }, [products, currentUser, fetchConversations]);
 
   const handleToggleUserProStatus = useCallback(async (userId: string) => {
     try {
@@ -419,10 +433,27 @@ const App: React.FC = () => {
       const updated = await api.updateReportStatus(reportId, status);
       setReports(prev => prev.map(r => r.id === reportId ? updated : r));
       showToast(`Signalement mis à jour : ${status}`, 'fa-solid fa-check-circle');
+
+      const report = reports.find(r => r.id === reportId);
+      if (report && currentUser) {
+        let msg = '';
+        if (status === ReportStatus.Resolved) {
+          msg = `Votre signalement concernant l'article "${report.product.title}" a été traité. Nous avons pris les mesures nécessaires. Merci de nous aider à garder BALAoui sûr !`;
+        } else if (status === ReportStatus.Dismissed) {
+          msg = `Après examen, nous n'avons pas trouvé de violation des règles concernant votre signalement pour "${report.product.title}". Merci de votre vigilance.`;
+        }
+
+        if (msg && report.reporter.id !== currentUser.id) {
+          // Create a conversation without a product if possible, or use the reported product
+          const conv = await api.findOrCreateConversation(currentUser, report.reporter, report.product);
+          await api.sendMessage(conv.id, `[NOTIFICATION SYSTÈME] ${msg}`, currentUser.id);
+          fetchConversations();
+        }
+      }
     } catch (err) {
       showToast('Erreur mise à jour signalement.', 'fa-solid fa-warning');
     }
-  }, []);
+  }, [reports, currentUser, fetchConversations]);
 
 
   const toggleTheme = () => {
