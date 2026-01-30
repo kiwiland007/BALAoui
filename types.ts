@@ -104,6 +104,7 @@ export interface User {
   balance: number;
   isPro: boolean;
   proSubscriptionExpires?: string;
+  isBanned?: boolean;
 }
 
 export interface Product {

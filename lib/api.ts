@@ -15,7 +15,8 @@ const mapProfileToUser = (profile: any): User => ({
     isAdmin: profile.is_admin,
     balance: Number(profile.balance) || 0,
     isPro: profile.is_pro,
-    proSubscriptionExpires: profile.pro_subscription_expires
+    proSubscriptionExpires: profile.pro_subscription_expires,
+    isBanned: profile.is_banned
 });
 
 const mapProductToApp = (p: any): Product => ({
@@ -493,6 +494,18 @@ const api = {
 
         if (error) throw error;
         return mapReportToApp(data);
+    },
+
+    toggleUserBan: async (userId: string, isBanned: boolean): Promise<User> => {
+        const { data, error } = await supabase
+            .from('profiles')
+            .update({ is_banned: isBanned })
+            .eq('id', userId)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return mapProfileToUser(data);
     }
 };
 

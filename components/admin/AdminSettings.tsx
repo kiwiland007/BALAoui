@@ -19,7 +19,7 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ settings, onSave }) => {
     const handleSave = () => {
         onSave(currentSettings);
     };
-    
+
     const handleReset = () => {
         setCurrentSettings(settings);
     }
@@ -50,7 +50,7 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ settings, onSave }) => {
                             <span>Commission de base (%)</span>
                         </label>
                         <div className="flex items-center space-x-4 mt-1">
-                             <input 
+                            <input
                                 type="number"
                                 id="commission"
                                 name="commission"
@@ -65,21 +65,21 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ settings, onSave }) => {
                         </div>
                         <p className="mt-2 text-xs text-text-light dark:text-gray-400">Le pourcentage prélevé sur les ventes des vendeurs standards.</p>
                     </div>
-                     <div>
+                    <div>
                         <label htmlFor="bumpPrice" className="flex items-center space-x-2 text-sm font-medium text-text-main dark:text-secondary">
-                           <i className="fa-solid fa-arrow-up w-4 text-center text-text-light"></i>
-                           <span>Prix du "Bump" (MAD)</span>
+                            <i className="fa-solid fa-arrow-up w-4 text-center text-text-light"></i>
+                            <span>Prix du "Bump" (MAD)</span>
                         </label>
                         <div className="flex items-center space-x-4 mt-1">
-                            <input type="number" id="bumpPrice" name="bumpPrice" value={currentSettings.bumpPrice} onChange={handleChange} className={inputClasses} step="1" min="0" max="50"/>
+                            <input type="number" id="bumpPrice" name="bumpPrice" value={currentSettings.bumpPrice} onChange={handleChange} className={inputClasses} step="1" min="0" max="50" />
                             <input type="range" min="0" max="50" step="1" name="bumpPrice" value={currentSettings.bumpPrice} onChange={handleChange} className={sliderClasses} />
                         </div>
-                         <p className="mt-2 text-xs text-text-light dark:text-gray-400">Le coût pour remonter un article en tête de liste.</p>
+                        <p className="mt-2 text-xs text-text-light dark:text-gray-400">Le coût pour remonter un article en tête de liste.</p>
                     </div>
-                     <div>
+                    <div>
                         <label htmlFor="featurePrice" className="flex items-center space-x-2 text-sm font-medium text-text-main dark:text-secondary">
                             <i className="fa-solid fa-star w-4 text-center text-text-light"></i>
-                           <span>Prix de la "Mise à la une" (MAD)</span>
+                            <span>Prix de la "Mise à la une" (MAD)</span>
                         </label>
                         <div className="flex items-center space-x-4 mt-1">
                             <input type="number" id="featurePrice" name="featurePrice" value={currentSettings.featurePrice} onChange={handleChange} className={inputClasses} step="5" min="0" max="200" />
@@ -91,7 +91,7 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ settings, onSave }) => {
             </Card>
 
             {/* Pro Seller Settings Card */}
-             <Card>
+            <Card>
                 <CardHeader>
                     <CardTitle>Paramètres Vendeur Pro</CardTitle>
                     <CardDescription>Gérez les avantages et le coût de l'abonnement Pro.</CardDescription>
@@ -100,42 +100,72 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ settings, onSave }) => {
                     <div>
                         <label htmlFor="proSubscriptionPrice" className="flex items-center space-x-2 text-sm font-medium text-text-main dark:text-secondary">
                             <i className="fa-solid fa-crown w-4 text-center text-text-light"></i>
-                           <span>Abonnement Pro (MAD/mois)</span>
+                            <span>Abonnement Pro (MAD/mois)</span>
                         </label>
-                         <div className="flex items-center space-x-4 mt-1">
+                        <div className="flex items-center space-x-4 mt-1">
                             <input type="number" id="proSubscriptionPrice" name="proSubscriptionPrice" value={currentSettings.proSubscriptionPrice} onChange={handleChange} className={inputClasses} step="1" min="0" max="300" />
                             <input type="range" min="0" max="300" step="1" name="proSubscriptionPrice" value={currentSettings.proSubscriptionPrice} onChange={handleChange} className={sliderClasses} />
                         </div>
                         <p className="mt-2 text-xs text-text-light dark:text-gray-400">Le prix mensuel pour l'abonnement Vendeur Pro.</p>
                     </div>
-                     <div>
+                    <div>
                         <label htmlFor="proCommission" className="flex items-center space-x-2 text-sm font-medium text-text-main dark:text-secondary">
-                             <i className="fa-solid fa-percent w-4 text-center text-text-light"></i>
+                            <i className="fa-solid fa-percent w-4 text-center text-text-light"></i>
                             <span>Commission Vendeur Pro (%)</span>
                         </label>
                         <div className="flex items-center space-x-4 mt-1">
                             <input type="number" id="proCommission" name="proCommission" value={currentSettings.proCommission} onChange={handleChange} className={inputClasses} step="0.5" min="0" max="10" />
                             <input type="range" min="0" max="10" step="0.5" name="proCommission" value={currentSettings.proCommission} onChange={handleChange} className={sliderClasses} />
                         </div>
-                         <p className="mt-2 text-xs text-text-light dark:text-gray-400">Le pourcentage réduit prélevé sur les ventes des Vendeurs Pro.</p>
+                        <p className="mt-2 text-xs text-text-light dark:text-gray-400">Le pourcentage réduit prélevé sur les ventes des Vendeurs Pro.</p>
                     </div>
                 </CardContent>
-             </Card>
-             
-             {/* Action Footer */}
-             <div className="lg:col-span-2">
-                 <Card>
+            </Card>
+
+            {/* Transaction Fees Card */}
+            <Card>
+                <CardHeader>
+                    <CardTitle>Frais & Expédition</CardTitle>
+                    <CardDescription>Configurez les frais appliqués lors des achats.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div>
+                        <label htmlFor="shippingFee" className="flex items-center space-x-2 text-sm font-medium text-text-main dark:text-secondary">
+                            <i className="fa-solid fa-truck w-4 text-center text-text-light"></i>
+                            <span>Frais de port fixes (MAD)</span>
+                        </label>
+                        <div className="flex items-center space-x-4 mt-1">
+                            <input type="number" id="shippingFee" name="shippingFee" value={currentSettings.shippingFee} onChange={handleChange} className={inputClasses} step="1" min="0" max="100" />
+                            <input type="range" min="0" max="100" step="1" name="shippingFee" value={currentSettings.shippingFee} onChange={handleChange} className={sliderClasses} />
+                        </div>
+                    </div>
+                    <div>
+                        <label htmlFor="buyerProtectionFeePercent" className="flex items-center space-x-2 text-sm font-medium text-text-main dark:text-secondary">
+                            <i className="fa-solid fa-shield-halved w-4 text-center text-text-light"></i>
+                            <span>Protection Acheteurs (%)</span>
+                        </label>
+                        <div className="flex items-center space-x-4 mt-1">
+                            <input type="number" id="buyerProtectionFeePercent" name="buyerProtectionFeePercent" value={currentSettings.buyerProtectionFeePercent} onChange={handleChange} className={inputClasses} step="0.5" min="0" max="15" />
+                            <input type="range" min="0" max="15" step="0.5" name="buyerProtectionFeePercent" value={currentSettings.buyerProtectionFeePercent} onChange={handleChange} className={sliderClasses} />
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Action Footer */}
+            <div className="lg:col-span-2">
+                <Card>
                     <CardFooter className="justify-end space-x-3">
                         <Button onClick={handleReset} variant="ghost" className="h-10 px-6" disabled={!isDirty}>
                             Réinitialiser
                         </Button>
-                         <Button onClick={handleSave} className="h-10 px-6" disabled={!isDirty}>
+                        <Button onClick={handleSave} className="h-10 px-6" disabled={!isDirty}>
                             <i className="fa-solid fa-save mr-2"></i>
                             Enregistrer les modifications
                         </Button>
                     </CardFooter>
-                 </Card>
-             </div>
+                </Card>
+            </div>
         </div>
     );
 };

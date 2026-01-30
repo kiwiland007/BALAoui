@@ -29,6 +29,7 @@ interface AdminPageProps {
     showToast: (message: string, icon: string) => void;
     onContentUpdate: (newContent: AppContent) => void;
     onToggleUserProStatus: (userId: string) => void;
+    onToggleUserBan: (userId: string, isBanned: boolean) => void;
     reports: Report[];
     onReportStatusChange: (reportId: string, status: ReportStatus) => void;
 }
@@ -45,6 +46,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
     showToast,
     onContentUpdate,
     onToggleUserProStatus,
+    onToggleUserBan,
     reports,
     onReportStatusChange,
 }) => {
@@ -75,7 +77,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
         }, {} as Record<string, number>);
 
         return Object.entries(counts)
-            .map(([name, value]) => ({ name, value }))
+            .map(([name, value]) => ({ name, value: value as number }))
             .sort((a, b) => b.value - a.value);
     }, [products]);
 
@@ -144,6 +146,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
                             users={filteredUsers}
                             onSearchChange={setUserSearch}
                             onShowToggleProConfirm={setUserToConfirmToggle}
+                            onToggleBan={(user) => onToggleUserBan(user.id, !user.isBanned)}
                         />
                     </Card>
                 </TabsContent>
@@ -183,7 +186,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
                 </TabsContent>
 
                 <TabsContent value="payments">
-                    <AdminPayments showToast={showToast} />
+                    <AdminPayments showToast={showToast} settings={appSettings} onSave={onUpdateSettings} />
                 </TabsContent>
 
                 <TabsContent value="content">

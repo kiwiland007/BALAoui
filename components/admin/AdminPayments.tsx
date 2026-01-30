@@ -3,23 +3,24 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '../ui
 import Button from '../ui/Button';
 import Badge from '../ui/Badge';
 import Switch from '../ui/Switch';
+import type { AppSettings } from '../../App';
 
 interface AdminPaymentsProps {
     showToast: (message: string, icon: string) => void;
+    settings: AppSettings;
+    onSave: (newSettings: AppSettings) => void;
 }
 
-const AdminPayments: React.FC<AdminPaymentsProps> = ({ showToast }) => {
-    const [paymentMethods, setPaymentMethods] = useState({
-        card: true,
-        balance: true,
-        cod: true,
-    });
-
-    const handleToggle = (method: keyof typeof paymentMethods) => {
-        setPaymentMethods(prev => ({
-            ...prev,
-            [method]: !prev[method],
-        }));
+const AdminPayments: React.FC<AdminPaymentsProps> = ({ showToast, settings, onSave }) => {
+    const handleToggle = (method: keyof typeof settings.paymentMethods) => {
+        const newSettings = {
+            ...settings,
+            paymentMethods: {
+                ...settings.paymentMethods,
+                [method]: !settings.paymentMethods[method]
+            }
+        };
+        onSave(newSettings);
         showToast('Paramètres de paiement mis à jour', 'fa-solid fa-check-circle');
     };
 
@@ -41,7 +42,7 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ showToast }) => {
                         <Button variant="ghost" disabled className="mt-4 h-9 px-4 text-xs">Gérer l'intégration</Button>
                     </CardContent>
                 </Card>
-                 <Card>
+                <Card>
                     <CardHeader className="flex flex-row items-start justify-between">
                         <div>
                             <CardTitle>Stripe</CardTitle>
@@ -49,7 +50,7 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ showToast }) => {
                         </div>
                     </CardHeader>
                     <CardContent>
-                         <p className="text-sm text-text-light dark:text-gray-400">Connectez Stripe pour accepter les paiements internationaux.</p>
+                        <p className="text-sm text-text-light dark:text-gray-400">Connectez Stripe pour accepter les paiements internationaux.</p>
                         <Button variant="outline" className="mt-4 h-9 px-4" onClick={() => showToast('Intégration Stripe non disponible.', 'fa-solid fa-info-circle')}>Se connecter à Stripe</Button>
                     </CardContent>
                 </Card>
@@ -57,32 +58,32 @@ const AdminPayments: React.FC<AdminPaymentsProps> = ({ showToast }) => {
 
             {/* Section 2: On-site methods */}
             <div>
-                 <h2 className="text-xl font-bold text-text-main dark:text-secondary mb-6">Méthodes Disponibles</h2>
-                 <Card>
+                <h2 className="text-xl font-bold text-text-main dark:text-secondary mb-6">Méthodes Disponibles</h2>
+                <Card>
                     <CardContent className="p-6 divide-y divide-gray-200 dark:divide-gray-700">
                         <div className="flex items-center justify-between py-4 first:pt-0 last:pb-0">
                             <div>
                                 <h4 className="font-semibold text-text-main dark:text-secondary">Carte Bancaire</h4>
                                 <p className="text-sm text-text-light dark:text-gray-400">Via CMI (Nécessite une passerelle active)</p>
                             </div>
-                            <Switch id="card-switch" checked={paymentMethods.card} onChange={() => handleToggle('card')} />
+                            <Switch id="card-switch" checked={settings.paymentMethods.card} onChange={() => handleToggle('card')} />
                         </div>
-                         <div className="flex items-center justify-between py-4 first:pt-0 last:pb-0">
+                        <div className="flex items-center justify-between py-4 first:pt-0 last:pb-0">
                             <div>
                                 <h4 className="font-semibold text-text-main dark:text-secondary">Solde BALAoui</h4>
                                 <p className="text-sm text-text-light dark:text-gray-400">Portefeuille interne de la plateforme</p>
                             </div>
-                            <Switch id="balance-switch" checked={paymentMethods.balance} onChange={() => handleToggle('balance')} />
+                            <Switch id="balance-switch" checked={settings.paymentMethods.balance} onChange={() => handleToggle('balance')} />
                         </div>
-                         <div className="flex items-center justify-between py-4 first:pt-0 last:pb-0">
+                        <div className="flex items-center justify-between py-4 first:pt-0 last:pb-0">
                             <div>
                                 <h4 className="font-semibold text-text-main dark:text-secondary">Paiement à la livraison</h4>
                                 <p className="text-sm text-text-light dark:text-gray-400">Option manuelle gérée par les utilisateurs</p>
                             </div>
-                            <Switch id="cod-switch" checked={paymentMethods.cod} onChange={() => handleToggle('cod')} />
+                            <Switch id="cod-switch" checked={settings.paymentMethods.cod} onChange={() => handleToggle('cod')} />
                         </div>
                     </CardContent>
-                 </Card>
+                </Card>
             </div>
         </div>
     );

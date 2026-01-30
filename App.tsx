@@ -34,6 +34,11 @@ export interface AppSettings {
   buyerProtectionFeePercent: number;
   buyerProtectionFeeFixed: number;
   shippingFee: number;
+  paymentMethods: {
+    card: boolean;
+    balance: boolean;
+    cod: boolean;
+  };
 }
 export interface AppContent {
   logoUrl?: string;
@@ -68,6 +73,11 @@ const App: React.FC = () => {
     buyerProtectionFeePercent: 5,
     buyerProtectionFeeFixed: 5,
     shippingFee: 35,
+    paymentMethods: {
+      card: true,
+      balance: true,
+      cod: true,
+    },
   });
 
   const [appContent, setAppContent] = useState<AppContent>({
@@ -115,12 +125,24 @@ const App: React.FC = () => {
   useEffect(() => {
     const initAuth = async () => {
       const user = await api.getCurrentUser();
-      setCurrentUser(user);
+      if (user?.isBanned) {
+        await api.logout();
+        setCurrentUser(null);
+        showToast("Votre compte est suspendu.", "fa-solid fa-user-slash");
+      } else {
+        setCurrentUser(user);
+      }
 
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
           const user = await api.getCurrentUser();
-          setCurrentUser(user);
+          if (user?.isBanned) {
+            await api.logout();
+            setCurrentUser(null);
+            showToast("Votre compte a été suspendu.", "fa-solid fa-user-slash");
+          } else {
+            setCurrentUser(user);
+          }
         } else if (event === 'SIGNED_OUT') {
           setCurrentUser(null);
         }
@@ -417,6 +439,19 @@ const App: React.FC = () => {
     }
   }, [users]);
 
+  const handleToggleUserBan = useCallback(async (userId: string, isBanned: boolean) => {
+    try {
+      const user = users.find(u => u.id === userId);
+      if (user) {
+        const updated = await api.toggleUserBan(userId, isBanned);
+        setUsers(prev => prev.map(u => u.id === userId ? updated : u));
+        showToast(`${user.name} a été ${isBanned ? 'banni' : 'débanni'}.`, isBanned ? 'fa-solid fa-user-slash' : 'fa-solid fa-user-check');
+      }
+    } catch (err) {
+      showToast('Erreur lors du bannissement.', 'fa-solid fa-warning');
+    }
+  }, [users]);
+
   const handleReportProduct = useCallback(async (productId: string, reason: string, details?: string) => {
     if (!currentUser) return;
     try {
@@ -573,6 +608,7 @@ const App: React.FC = () => {
             showToast={showToast}
             onContentUpdate={handleContentUpdate}
             onToggleUserProStatus={handleToggleUserProStatus}
+            onToggleUserBan={handleToggleUserBan}
           />
         case 'chat':
           return <ChatPage
