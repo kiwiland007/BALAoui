@@ -664,6 +664,13 @@ const App: React.FC = () => {
           orders={orders}
           onUpdateOrderShipping={handleUpdateOrderShipping}
         />;
+      case 'auth':
+        return <AuthPage
+          onLogin={handleLogin}
+          showToast={showToast}
+          onNavigate={handleNavigate}
+          logoUrl={appContent.logoUrl}
+        />;
       case 'chat':
         return <ChatPage
           currentUser={currentUser!}

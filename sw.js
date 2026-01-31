@@ -4,7 +4,7 @@ const urlsToCache = [
   '/index.html',
   '/manifest.json',
   // Key assets
-  'https://i.ibb.co/9vM9yBv/logo-no-background.png'
+  'https://fvpfftekhhzhjvbtrmsq.supabase.co/storage/v1/object/public/products/96c5b7d2-8c88-4792-b8e4-35d420e3b787/1769802953235.png'
 ];
 
 // Install the service worker and cache the app shell
@@ -37,7 +37,7 @@ self.addEventListener('fetch', event => {
               .then(cache => {
                 // We only cache GET requests
                 if (event.request.method === 'GET') {
-                    cache.put(event.request, responseToCache);
+                  cache.put(event.request, responseToCache);
                 }
               });
           }
