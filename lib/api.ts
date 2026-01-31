@@ -1,7 +1,7 @@
 
 import { supabase } from './supabase';
 import type { Product, User, Review, Transaction, Conversation, Message, Order, Report, Dispute } from '../types';
-import { ProductStatus, OrderStatus, TransactionType, TransactionStatus, ReportStatus, DisputeStatus } from '../types';
+import { ProductStatus, OrderStatus, TransactionType, TransactionStatus, ReportStatus, DisputeStatus, ShippingMethod } from '../types';
 
 // Utility to convert Supabase row to our app types
 const mapProfileToUser = (profile: any): User => ({
@@ -33,7 +33,8 @@ const mapProductToApp = (p: any): Product => ({
     seller: p.profiles ? mapProfileToUser(p.profiles) : (p.seller ? mapProfileToUser(p.seller) : {} as User),
     status: p.status as ProductStatus,
     isFeatured: p.is_featured,
-    boostedUntil: p.boosted_until
+    boostedUntil: p.boosted_until,
+    availableShippingMethods: p.available_shipping_methods || []
 });
 
 const mapReportToApp = (r: any): Report => ({
@@ -123,7 +124,8 @@ const api = {
                 city: productData.city,
                 images: productData.images,
                 seller_id: sellerId,
-                status: ProductStatus.Pending
+                status: ProductStatus.Pending,
+                available_shipping_methods: productData.availableShippingMethods || []
             })
             .select('*, profiles(*)')
             .single();
@@ -147,7 +149,8 @@ const api = {
                 images: product.images,
                 status: product.status,
                 is_featured: product.isFeatured,
-                boosted_until: product.boostedUntil
+                boosted_until: product.boostedUntil,
+                available_shipping_methods: product.availableShippingMethods || []
             })
             .eq('id', product.id)
             .select('*, profiles(*)')
@@ -274,6 +277,30 @@ const api = {
         return mapProfileToUser(profile);
     },
 
+    loginWithGoogle: async (): Promise<User> => {
+        const { data, error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+                redirectTo: window.location.origin
+            }
+        });
+        if (error) throw error;
+        // OAuth redirects, so this won't return a user directly here.
+        // The AuthPage.tsx logic might need to be adjusted to handle session-based redirect.
+        return {} as User; // Temporary until session is picked up by App.tsx
+    },
+
+    loginWithFacebook: async (): Promise<User> => {
+        const { data, error } = await supabase.auth.signInWithOAuth({
+            provider: 'facebook',
+            options: {
+                redirectTo: window.location.origin
+            }
+        });
+        if (error) throw error;
+        return {} as User;
+    },
+
     logout: async () => {
         await supabase.auth.signOut();
     },
@@ -296,6 +323,7 @@ const api = {
             buyerProtectionFee: Number(o.buyer_protection_fee),
             trackingNumber: o.tracking_number,
             shippingProvider: o.shipping_provider,
+            selectedShippingMethod: o.selected_shipping_method as ShippingMethod,
             shippedAt: o.shipped_at,
             deliveredAt: o.delivered_at,
             createdAt: o.created_at,
@@ -303,7 +331,7 @@ const api = {
         }));
     },
 
-    createOrder: async (product: Product, buyer: User, buyerProtectionFee: number, shippingFee: number, totalAmount: number): Promise<Order> => {
+    createOrder: async (product: Product, buyer: User, buyerProtectionFee: number, shippingFee: number, totalAmount: number, shippingMethod?: ShippingMethod): Promise<Order> => {
         const { data, error } = await supabase
             .from('orders')
             .insert({
@@ -313,7 +341,8 @@ const api = {
                 total_amount: totalAmount,
                 shipping_fee: shippingFee,
                 buyer_protection_fee: buyerProtectionFee,
-                status: OrderStatus.Paid
+                status: OrderStatus.Paid,
+                selected_shipping_method: shippingMethod
             })
             .select('*, product:products(*), buyer:profiles!buyer_id(*), seller:profiles!seller_id(*)')
             .single();
@@ -336,6 +365,7 @@ const api = {
             buyerProtectionFee: Number(data.buyer_protection_fee),
             trackingNumber: data.tracking_number,
             shippingProvider: data.shipping_provider,
+            selectedShippingMethod: data.selected_shipping_method as ShippingMethod,
             shippedAt: data.shipped_at,
             deliveredAt: data.delivered_at,
             createdAt: data.created_at,

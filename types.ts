@@ -92,6 +92,12 @@ export enum OrderStatus {
   Disputed = "En litige",
 }
 
+export enum ShippingMethod {
+  Standard = "Standard (Amana/Aramex)",
+  LocalPickup = "Remise en main propre",
+  SellerDelivery = "Livraison par le vendeur",
+}
+
 export interface User {
   id: string;
   name: string;
@@ -122,6 +128,7 @@ export interface Product {
   status: ProductStatus;
   isFeatured?: boolean;
   boostedUntil?: string;
+  availableShippingMethods?: ShippingMethod[];
 }
 
 export interface Review {
@@ -153,6 +160,7 @@ export interface Order {
   buyerProtectionFee: number;
   trackingNumber?: string;
   shippingProvider?: string;
+  selectedShippingMethod?: ShippingMethod;
   shippedAt?: string;
   deliveredAt?: string;
   createdAt: string;

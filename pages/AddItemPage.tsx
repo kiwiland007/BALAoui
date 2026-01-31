@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import type { Product } from '../types';
-import { ProductCategory, ProductCondition } from '../types';
+import { ProductCategory, ProductCondition, ShippingMethod } from '../types';
 import { moroccanCities, sizeOptionsByCategory } from '../constants';
 import Button from '../components/ui/Button';
 
@@ -22,6 +22,7 @@ const AddItemPage: React.FC<AddItemPageProps> = ({ onAddItem, onCancel }) => {
   const [condition, setCondition] = useState<ProductCondition>(ProductCondition.BonEtat);
   const [size, setSize] = useState('');
   const [city, setCity] = useState('');
+  const [availableShippingMethods, setAvailableShippingMethods] = useState<ShippingMethod[]>([ShippingMethod.Standard]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -42,7 +43,8 @@ const AddItemPage: React.FC<AddItemPageProps> = ({ onAddItem, onCancel }) => {
       const newFiles = Array.from(e.target.files);
       const validFiles: File[] = [];
 
-      for (const file of newFiles) {
+      for (const fileItem of newFiles) {
+        const file = fileItem as File;
         if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
           alert(`Type "${file.type}" non supporté.`);
           continue;
@@ -95,6 +97,7 @@ const AddItemPage: React.FC<AddItemPageProps> = ({ onAddItem, onCancel }) => {
         size: size || undefined,
         city,
         images: [], // Will be filled in the parent after upload
+        availableShippingMethods,
       }, files);
     } catch (err) {
       console.error(err);
@@ -200,8 +203,8 @@ const AddItemPage: React.FC<AddItemPageProps> = ({ onAddItem, onCancel }) => {
                     key={s}
                     onClick={() => setSize(s === size ? '' : s)}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${size === s
-                        ? 'bg-primary text-white border-primary shadow-md scale-105'
-                        : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-text-main dark:text-secondary hover:border-primary hover:text-primary'
+                      ? 'bg-primary text-white border-primary shadow-md scale-105'
+                      : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-text-main dark:text-secondary hover:border-primary hover:text-primary'
                       }`}
                   >
                     {s}
@@ -234,6 +237,28 @@ const AddItemPage: React.FC<AddItemPageProps> = ({ onAddItem, onCancel }) => {
               <option value="">Sélectionnez une ville</option>
               {moroccanCities.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
+          </div>
+
+          <div className="space-y-3">
+            <label className="block text-sm font-semibold text-text-main dark:text-secondary mb-1">Moyens de livraison disponibles</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {Object.values(ShippingMethod).map(method => (
+                <label key={method} className={`flex items-center space-x-3 p-3 rounded-xl border transition-all cursor-pointer ${availableShippingMethods.includes(method) ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}>
+                  <input
+                    type="checkbox"
+                    checked={availableShippingMethods.includes(method)}
+                    onChange={() => {
+                      setAvailableShippingMethods(prev =>
+                        prev.includes(method) ? prev.filter(m => m !== method) : [...prev, method]
+                      )
+                    }}
+                    className="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary"
+                  />
+                  <span className="text-sm font-medium text-text-main dark:text-secondary">{method}</span>
+                </label>
+              ))}
+            </div>
+            {availableShippingMethods.length === 0 && <p className="text-xs text-red-500 font-medium animate-pulse">Sélectionnez au moins un mode de livraison.</p>}
           </div>
 
           <div className="flex items-center justify-end space-x-4 pt-6 border-t dark:border-gray-700">

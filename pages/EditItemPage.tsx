@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import type { Product } from '../types';
-import { ProductCategory, ProductCondition } from '../types';
+import { ProductCategory, ProductCondition, ShippingMethod } from '../types';
 import { moroccanCities, sizeOptionsByCategory } from '../constants';
 import Button from '../components/ui/Button';
 
@@ -24,6 +24,7 @@ const EditItemPage: React.FC<EditItemPageProps> = ({ product, onUpdateItem, onCa
   const [size, setSize] = useState(product.size || '');
   const [city, setCity] = useState(product.city);
   const [images, setImages] = useState<string[]>(product.images);
+  const [availableShippingMethods, setAvailableShippingMethods] = useState<ShippingMethod[]>(product.availableShippingMethods || [ShippingMethod.Standard]);
 
   const dragItem = useRef<number | null>(null);
   const dragOverItem = useRef<number | null>(null);
@@ -96,6 +97,7 @@ const EditItemPage: React.FC<EditItemPageProps> = ({ product, onUpdateItem, onCa
       size: size || undefined,
       city,
       images: images.length > 0 ? images : ['https://picsum.photos/seed/newitem/600/800'],
+      availableShippingMethods,
     };
     onUpdateItem(updatedProduct);
   };
@@ -182,8 +184,8 @@ const EditItemPage: React.FC<EditItemPageProps> = ({ product, onUpdateItem, onCa
                     key={s}
                     onClick={() => setSize(s === size ? '' : s)} // Allow deselecting
                     className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${size === s
-                        ? 'bg-primary text-white border-primary'
-                        : 'bg-transparent border-gray-300 dark:border-gray-600 hover:border-primary hover:text-primary dark:hover:text-primary'
+                      ? 'bg-primary text-white border-primary'
+                      : 'bg-transparent border-gray-300 dark:border-gray-600 hover:border-primary hover:text-primary dark:hover:text-primary'
                       }`}
                   >
                     {s}
@@ -210,6 +212,27 @@ const EditItemPage: React.FC<EditItemPageProps> = ({ product, onUpdateItem, onCa
               <option value="">Sélectionnez une ville</option>
               {moroccanCities.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
+          </div>
+
+          <div className="space-y-3">
+            <label className="block text-sm font-semibold text-text-main dark:text-secondary mb-1">Moyens de livraison disponibles</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {Object.values(ShippingMethod).map(method => (
+                <label key={method} className={`flex items-center space-x-3 p-3 rounded-xl border transition-all cursor-pointer ${availableShippingMethods.includes(method) ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}>
+                  <input
+                    type="checkbox"
+                    checked={availableShippingMethods.includes(method)}
+                    onChange={() => {
+                      setAvailableShippingMethods(prev =>
+                        prev.includes(method) ? prev.filter(m => m !== method) : [...prev, method]
+                      )
+                    }}
+                    className="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary"
+                  />
+                  <span className="text-sm font-medium text-text-main dark:text-secondary">{method}</span>
+                </label>
+              ))}
+            </div>
           </div>
 
           <div className="flex justify-end space-x-4 pt-4">

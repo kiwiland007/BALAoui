@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import type { Product, User, Conversation, Message, Transaction, Order, Report, Dispute, View } from './types';
-import { ProductStatus, OrderStatus, TransactionType, TransactionStatus, ReportStatus, DisputeStatus } from './types';
+import { ProductStatus, OrderStatus, TransactionType, TransactionStatus, ReportStatus, DisputeStatus, ShippingMethod } from './types';
 import api from './lib/api';
 import { supabase } from './lib/supabase';
 import Header from './components/Header';
@@ -277,13 +277,13 @@ const App: React.FC = () => {
     }
   }, [currentUser, handleNavigate]);
 
-  const handleCreateOrder = useCallback(async (product: Product, buyerProtectionFee: number, shippingFee: number, totalAmount: number) => {
+  const handleCreateOrder = useCallback(async (product: Product, buyerProtectionFee: number, shippingFee: number, totalAmount: number, shippingMethod: ShippingMethod) => {
     if (!currentUser) {
       handleNavigate({ name: 'auth' });
       return;
     }
     try {
-      const newOrder = await api.createOrder(product, currentUser, buyerProtectionFee, shippingFee, totalAmount);
+      const newOrder = await api.createOrder(product, currentUser, buyerProtectionFee, shippingFee, totalAmount, shippingMethod);
       setOrders(prev => [newOrder, ...prev]);
       setProducts(prev => prev.map(p => p.id === product.id ? { ...p, status: ProductStatus.Sold } : p));
       showToast(`Commande passée!`, "fa-solid fa-check-circle");

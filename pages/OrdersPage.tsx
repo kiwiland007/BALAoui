@@ -66,6 +66,11 @@ const OrderCard: React.FC<{
                             <i className={`fa-solid ${statusInfo.icon}`}></i>
                             <span>{statusInfo.text}</span>
                         </p>
+                        {order.selectedShippingMethod && (
+                            <p className="text-[10px] uppercase font-bold text-text-light dark:text-gray-500 mt-1">
+                                {order.selectedShippingMethod}
+                            </p>
+                        )}
                     </div>
                 </div>
                 {order.trackingNumber && (
